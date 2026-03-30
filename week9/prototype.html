@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrickBuddy - LEGO Robot Building Assistant</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #FF6B35;
+    --primary-light: #FF8F65;
+    --secondary: #4ECDC4;
+    --accent: #FFE66D;
+    --purple: #A855F7;
+    --pink: #F472B6;
+    --blue: #60A5FA;
+    --green: #34D399;
+    --bg: #FFF8F0;
+    --text: #2D3436;
+    --card: #FFFFFF;
+    --shadow: 0 8px 32px rgba(0,0,0,0.08);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+  }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ===== App Shell ===== */
+  .app-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ===== Screens ===== */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+    opacity: 0;
+    transform: translateX(100%);
+    pointer-events: none;
+    overflow-y: auto;
+  }
+  .screen.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+  .screen.exit-left {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  /* ===== SCREEN 0: Splash ===== */
+  .splash {
+    background: linear-gradient(135deg, #FF6B35 0%, #FF8F65 30%, #FFE66D 60%, #4ECDC4 100%);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+    padding: 40px;
+  }
+  .splash .mascot {
+    width: 200px;
+    height: 200px;
+    background: var(--card);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 100px;
+    box-shadow: var(--shadow-lg);
+    animation: bounce 2s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+  }
+  .splash h1 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 52px;
+    color: white;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+    letter-spacing: -1px;
+  }
+  .splash p {
+    font-size: 20px;
+    color: rgba(255,255,255,0.95);
+    font-weight: 600;
+    max-width: 500px;
+  }
+  .splash .start-btn {
+    margin-top: 20px;
+    padding: 18px 60px;
+    font-size: 24px;
+    font-weight: 700;
+    font-family: 'Fredoka', sans-serif;
+    background: white;
+    color: var(--primary);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.1), var(--shadow);
+    transition: all 0.15s;
+  }
+  .splash .start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 0 rgba(0,0,0,0.1), var(--shadow-lg);
+  }
+  .splash .start-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.1);
+  }
+
+  /* ===== Top Nav Bar ===== */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    padding: 12px 24px;
+    background: white;
+    border-bottom: 3px solid #f0f0f0;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .top-bar .back-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .top-bar .back-btn:hover { background: #f5f5f5; }
+  .top-bar .logo-small {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+  .top-bar .logo-small span { color: var(--secondary); }
+  .progress-bar {
+    flex: 1;
+    height: 12px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 12px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--secondary), var(--green));
+    border-radius: 10px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .stage-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #888;
+    white-space: nowrap;
+  }
+
+  /* ===== SCREEN 1: Imagine Stage ===== */
+  .imagine-screen { background: var(--bg); }
+  .imagine-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .buddy-chat {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .buddy-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(255,107,53,0.3);
+  }
+  .buddy-bubble {
+    background: white;
+    border-radius: 20px;
+    border-top-left-radius: 6px;
+    padding: 16px 20px;
+    box-shadow: var(--shadow);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.5;
+    max-width: 600px;
+  }
+  .buddy-bubble .highlight {
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  .input-area {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .input-card {
+    flex: 1;
+    min-width: 200px;
+    max-width: 350px;
+    background: white;
+    border-radius: 24px;
+    padding: 28px 24px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 3px solid transparent;
+  }
+  .input-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+  .input-card.selected {
+    border-color: var(--primary);
+    background: #FFF5EE;
+  }
+  .input-card .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  .input-card h3 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  .input-card p {
+    font-size: 14px;
+    color: #888;
+  }
+
+  /* Voice recording UI */
+  .voice-panel {
+    background: white;
+    border-radius: 24px;
+    padding: 32px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    display: none;
+  }
+  .voice-panel.visible { display: block; }
+  .voice-wave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 60px;
+    margin: 20px 0;
+  }
+  .voice-wave .bar {
+    width: 6px;
+    border-radius: 3px;
+    background: var(--primary);
+    animation: wave 1s ease-in-out infinite;
+  }
+  @keyframes wave {
+    0%, 100% { height: 10px; opacity: 0.4; }
+    50% { height: 40px; opacity: 1; }
+  }
+  .voice-wave .bar:nth-child(2) { animation-delay: 0.1s; }
+  .voice-wave .bar:nth-child(3) { animation-delay: 0.2s; }
+  .voice-wave .bar:nth-child(4) { animation-delay: 0.3s; }
+  .voice-wave .bar:nth-child(5) { animation-delay: 0.15s; }
+  .voice-wave .bar:nth-child(6) { animation-delay: 0.25s; }
+  .voice-wave .bar:nth-child(7) { animation-delay: 0.05s; }
+
+  .mic-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #FF6B35, #FF8F65);
+    color: white;
+    font-size: 32px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,107,53,0.4);
+    transition: all 0.2s;
+  }
+  .mic-btn:hover { transform: scale(1.08); }
+  .mic-btn.recording {
+    background: linear-gradient(135deg, #EF4444, #F87171);
+    animation: pulse-ring 1.5s ease infinite;
+  }
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+    70% { box-shadow: 0 0 0 20px rgba(239,68,68,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  }
+
+  /* Camera panel */
+  .camera-panel {
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    display: none;
+  }
+  .camera-panel.visible { display: block; }
+  .camera-preview {
+    width: 100%;
+    max-width: 500px;
+    aspect-ratio: 4/3;
+    background: #1a1a2e;
+    border-radius: 16px;
+    margin: 16px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .camera-preview .viewfinder {
+    position: absolute;
+    width: 60%;
+    height: 60%;
+    border: 3px solid rgba(255,255,255,0.5);
+    border-radius: 12px;
+  }
+  .camera-preview .corner { position: absolute; width: 20px; height: 20px; }
+  .camera-preview .corner.tl { top: 16%; left: 16%; border-top: 3px solid white; border-left: 3px solid white; }
+  .camera-preview .corner.tr { top: 16%; right: 16%; border-top: 3px solid white; border-right: 3px solid white; }
+  .camera-preview .corner.bl { bottom: 16%; left: 16%; border-bottom: 3px solid white; border-left: 3px solid white; }
+  .camera-preview .corner.br { bottom: 16%; right: 16%; border-bottom: 3px solid white; border-right: 3px solid white; }
+  .snap-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 4px solid var(--secondary);
+    background: white;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .snap-btn::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--secondary);
+    transition: all 0.15s;
+  }
+  .snap-btn:hover::after { background: var(--green); }
+
+  /* Template choices */
+  .template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .template-card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px 12px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 3px solid transparent;
+  }
+  .template-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--shadow-lg);
+  }
+  .template-card.selected {
+    border-color: var(--primary);
+    background: #FFF5EE;
+  }
+  .template-card .emoji { font-size: 40px; margin-bottom: 8px; }
+  .template-card .name {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* Child chat bubble */
+  .child-chat {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    flex-direction: row-reverse;
+  }
+  .child-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .child-bubble {
+    background: linear-gradient(135deg, var(--blue), #818CF8);
+    color: white;
+    border-radius: 20px;
+    border-top-right-radius: 6px;
+    padding: 14px 18px;
+    box-shadow: 0 4px 16px rgba(96,165,250,0.3);
+    font-size: 16px;
+    font-weight: 600;
+    max-width: 400px;
+  }
+
+  /* ===== SCREEN 2: Build Stage ===== */
+  .build-screen { background: var(--bg); }
+  .build-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    padding: 20px;
+    overflow: hidden;
+  }
+  @media (max-width: 800px) {
+    .build-layout { grid-template-columns: 1fr; }
+  }
+
+  .instruction-panel {
+    background: white;
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .step-number {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .step-visual {
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: linear-gradient(135deg, #FFF5EE, #FFF0E5);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    border: 2px dashed #FFD4B8;
+    position: relative;
+  }
+  .step-visual .lego-preview {
+    font-size: 80px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+  }
+  .step-visual .label-3d {
+    position: absolute;
+    bottom: 10px;
+    right: 14px;
+    background: var(--primary);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .step-description {
+    font-size: 17px;
+    line-height: 1.6;
+    color: #555;
+    margin-bottom: 16px;
+  }
+  .step-description strong { color: var(--primary); }
+  .pieces-needed {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .piece {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: #FFF5EE;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .piece .dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+  .step-nav {
+    display: flex;
+    gap: 12px;
+  }
+  .step-btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .step-btn.prev {
+    background: #f0f0f0;
+    color: #666;
+  }
+  .step-btn.next {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    box-shadow: 0 4px 12px rgba(255,107,53,0.3);
+  }
+  .step-btn:hover { transform: translateY(-2px); }
+  .step-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Chat sidebar */
+  .chat-sidebar {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .chat-header {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--secondary), var(--green));
+    color: white;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .chat-msg {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .chat-msg.from-buddy .chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .chat-msg.from-child {
+    flex-direction: row-reverse;
+  }
+  .chat-msg.from-child .chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .chat-text {
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    max-width: 260px;
+  }
+  .from-buddy .chat-text {
+    background: #f5f5f5;
+    border-top-left-radius: 4px;
+  }
+  .from-child .chat-text {
+    background: linear-gradient(135deg, var(--blue), #818CF8);
+    color: white;
+    border-top-right-radius: 4px;
+  }
+  .chat-input-bar {
+    padding: 12px;
+    border-top: 2px solid #f0f0f0;
+    display: flex;
+    gap: 8px;
+  }
+  .chat-input {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 14px;
+    font-family: 'Nunito', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .chat-input:focus { border-color: var(--secondary); }
+  .chat-send {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(135deg, var(--secondary), var(--green));
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chat-send:hover { transform: scale(1.05); }
+  .chat-mic {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chat-mic:hover { background: #f5f5f5; }
+
+  /* STEAM badge */
+  .steam-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 6px;
+  }
+  .steam-badge.science { background: #DBEAFE; color: #2563EB; }
+  .steam-badge.tech { background: #F3E8FF; color: #7C3AED; }
+  .steam-badge.engineering { background: #FEF3C7; color: #D97706; }
+  .steam-badge.art { background: #FCE7F3; color: #DB2777; }
+  .steam-badge.math { background: #D1FAE5; color: #059669; }
+
+  /* ===== SCREEN 3: STEAM Q&A ===== */
+  .qa-screen { background: var(--bg); }
+  .qa-content {
+    flex: 1;
+    padding: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .qa-topic-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .qa-topic {
+    padding: 10px 18px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .qa-topic.active { border-color: currentColor; transform: scale(1.05); }
+  .qa-topic.s { background: #DBEAFE; color: #2563EB; }
+  .qa-topic.t { background: #F3E8FF; color: #7C3AED; }
+  .qa-topic.e { background: #FEF3C7; color: #D97706; }
+  .qa-topic.a { background: #FCE7F3; color: #DB2777; }
+  .qa-topic.m { background: #D1FAE5; color: #059669; }
+
+  .qa-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .qa-question {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .qa-answer {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #555;
+  }
+  .qa-answer strong { color: var(--primary); }
+  .qa-fun-fact {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: #FFF5EE;
+    border-radius: 12px;
+    border-left: 4px solid var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Summary card */
+  .summary-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .summary-card h3 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 20px;
+    margin-bottom: 16px;
+  }
+  .summary-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #f8f8f8;
+  }
+  .summary-item .check { color: var(--green); }
+
+  /* ===== SCREEN 4: Celebration ===== */
+  .celebrate-screen {
+    background: linear-gradient(135deg, #4ECDC4, #34D399, #60A5FA);
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+    padding: 40px;
+  }
+  .trophy { font-size: 120px; animation: bounce 2s ease-in-out infinite; }
+  .celebrate-screen h1 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 48px;
+    color: white;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.1);
+  }
+  .celebrate-screen p {
+    font-size: 20px;
+    color: rgba(255,255,255,0.9);
+    font-weight: 600;
+    max-width: 500px;
+  }
+  .stats-row {
+    display: flex;
+    gap: 20px;
+    margin: 20px 0;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 20px 28px;
+    text-align: center;
+    color: white;
+  }
+  .stat-card .stat-num {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+  }
+  .stat-card .stat-label { font-size: 14px; font-weight: 600; opacity: 0.85; }
+  .celebrate-screen .restart-btn {
+    margin-top: 16px;
+    padding: 16px 48px;
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Fredoka', sans-serif;
+    background: white;
+    color: var(--secondary);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.1);
+    transition: all 0.15s;
+  }
+  .celebrate-screen .restart-btn:hover { transform: translateY(-2px); }
+
+  /* Confetti */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    overflow: hidden;
+  }
+  .confetti {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    top: -20px;
+    animation: confetti-fall linear forwards;
+  }
+  @keyframes confetti-fall {
+    to { top: 110vh; transform: rotate(720deg); }
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+  .typing-indicator .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ccc;
+    animation: typing-bounce 1.2s ease-in-out infinite;
+  }
+  .typing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
+  }
+
+  /* Emotion support banner */
+  .emotion-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    animation: fadeIn 0.5s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  .emotion-banner .emoji { font-size: 28px; }
+
+  /* Next stage button */
+  .next-stage-btn {
+    padding: 14px 36px;
+    border: none;
+    border-radius: 16px;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'Fredoka', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px auto;
+  }
+  .next-stage-btn.primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    box-shadow: 0 4px 16px rgba(255,107,53,0.3);
+  }
+  .next-stage-btn:hover { transform: translateY(-2px); }
+</style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- ===== SCREEN 0: Splash ===== -->
+  <div class="screen splash active" id="screen-splash">
+    <div class="mascot">🤖</div>
+    <h1>BrickBuddy</h1>
+    <p>Your AI friend that helps you build amazing LEGO robots! Tell me what you want to build, and I'll guide you step by step.</p>
+    <button class="start-btn" onclick="goToScreen(1)">Let's Build! 🚀</button>
+  </div>
+
+  <!-- ===== SCREEN 1: Imagine Stage ===== -->
+  <div class="screen imagine-screen" id="screen-imagine">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goToScreen(0)">&#8592;</button>
+      <div class="logo-small">Brick<span>Buddy</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width: 20%"></div></div>
+      <div class="stage-label">Stage 1: Imagine</div>
+    </div>
+    <div class="imagine-content">
+      <div class="buddy-chat">
+        <div class="buddy-avatar">🤖</div>
+        <div class="buddy-bubble">
+          Hi there, little builder! 👋 <br>
+          What kind of robot do you want to build today? You can <span class="highlight">tell me</span>, <span class="highlight">show me</span>, or <span class="highlight">pick one below</span>!
+        </div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-card" onclick="showVoice()" id="card-voice">
+          <div class="icon">🎤</div>
+          <h3>Talk to Me</h3>
+          <p>Describe your dream robot!</p>
+        </div>
+        <div class="input-card" onclick="showCamera()" id="card-camera">
+          <div class="icon">📸</div>
+          <h3>Show Me</h3>
+          <p>Take a photo of your idea!</p>
+        </div>
+        <div class="input-card" onclick="showTemplates()" id="card-template">
+          <div class="icon">🧩</div>
+          <h3>Pick One</h3>
+          <p>Choose a robot to start!</p>
+        </div>
+      </div>
+
+      <!-- Voice Panel -->
+      <div class="voice-panel" id="voice-panel">
+        <h3 style="font-family:Fredoka;font-size:20px;margin-bottom:8px">Tell me about your robot!</h3>
+        <p style="color:#888;font-size:14px">Press the button and start talking</p>
+        <div class="voice-wave" id="voice-wave" style="display:none">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+        <br>
+        <button class="mic-btn" id="mic-btn" onclick="toggleRecording()">🎤</button>
+        <p id="voice-status" style="margin-top:12px;font-weight:600;color:#888"></p>
+      </div>
+
+      <!-- Camera Panel -->
+      <div class="camera-panel" id="camera-panel">
+        <h3 style="font-family:Fredoka;font-size:20px;margin-bottom:4px">Show me your idea!</h3>
+        <p style="color:#888;font-size:14px">Point the camera at your drawing or LEGO pieces</p>
+        <div class="camera-preview">
+          <span>📷</span>
+          <div class="corner tl"></div>
+          <div class="corner tr"></div>
+          <div class="corner bl"></div>
+          <div class="corner br"></div>
+        </div>
+        <button class="snap-btn" onclick="takePhoto()"></button>
+      </div>
+
+      <!-- Templates -->
+      <div id="template-section" style="display:none">
+        <div class="template-grid">
+          <div class="template-card" onclick="selectTemplate(this,'Robot Dog 🐶')">
+            <div class="emoji">🐶</div>
+            <div class="name">Robot Dog</div>
+          </div>
+          <div class="template-card" onclick="selectTemplate(this,'Robot Car 🏎️')">
+            <div class="emoji">🏎️</div>
+            <div class="name">Robot Car</div>
+          </div>
+          <div class="template-card" onclick="selectTemplate(this,'Robot Dinosaur 🦕')">
+            <div class="emoji">🦕</div>
+            <div class="name">Dino Bot</div>
+          </div>
+          <div class="template-card" onclick="selectTemplate(this,'Space Robot 🚀')">
+            <div class="emoji">🚀</div>
+            <div class="name">Space Bot</div>
+          </div>
+          <div class="template-card" onclick="selectTemplate(this,'Robot Helper 🏠')">
+            <div class="emoji">🏠</div>
+            <div class="name">Home Helper</div>
+          </div>
+          <div class="template-card" onclick="selectTemplate(this,'Bug Bot 🐛')">
+            <div class="emoji">🐛</div>
+            <div class="name">Bug Bot</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Simulated child reply after interaction -->
+      <div id="child-reply" style="display:none">
+        <div class="child-chat">
+          <div class="child-avatar">👦</div>
+          <div class="child-bubble" id="child-reply-text">I want to build a robot dog that can walk and wag its tail!</div>
+        </div>
+      </div>
+
+      <!-- AI understanding -->
+      <div id="ai-understanding" style="display:none">
+        <div class="buddy-chat">
+          <div class="buddy-avatar">🤖</div>
+          <div class="buddy-bubble">
+            Awesome choice! 🎉 A <strong id="robot-choice">Robot Dog</strong> that can move — I love it!<br><br>
+            Let me think about what pieces you'll need... 🧱<br><br>
+            <span class="highlight">Ready to start building?</span>
+          </div>
+        </div>
+        <button class="next-stage-btn primary" onclick="goToScreen(2)" style="margin-top:16px">
+          Start Building! 🔨
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 2: Build Stage ===== -->
+  <div class="screen build-screen" id="screen-build">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goToScreen(1)">&#8592;</button>
+      <div class="logo-small">Brick<span>Buddy</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width: 55%"></div></div>
+      <div class="stage-label">Stage 2: Build</div>
+    </div>
+    <div class="build-layout">
+      <!-- Left: Instructions -->
+      <div class="instruction-panel" id="instruction-panel">
+        <div class="emotion-banner" id="emotion-banner">
+          <span class="emoji">💪</span>
+          <span>You're doing great! Building robots takes patience — each step gets us closer!</span>
+        </div>
+        <div class="step-header">
+          <div class="step-number" id="step-num">1</div>
+          <div class="step-title" id="step-title">Build the Body Base</div>
+        </div>
+        <div class="step-visual">
+          <div class="lego-preview" id="step-emoji">🧱</div>
+          <div class="label-3d">3D View</div>
+        </div>
+        <div class="step-description" id="step-desc">
+          Start with a <strong>flat 4x8 plate</strong> — this will be the body of your robot dog! Place it on the table in front of you. This is like building the skeleton that holds everything together.
+        </div>
+        <div class="pieces-needed" id="step-pieces">
+          <div class="piece"><div class="dot" style="background:#EF4444"></div> 1x Red 4x8 Plate</div>
+          <div class="piece"><div class="dot" style="background:#3B82F6"></div> 2x Blue 2x4 Bricks</div>
+        </div>
+        <div class="step-nav">
+          <button class="step-btn prev" id="prev-btn" onclick="changeStep(-1)" disabled>&#8592; Previous</button>
+          <button class="step-btn next" id="next-btn" onclick="changeStep(1)">Next Step &#8594;</button>
+        </div>
+      </div>
+
+      <!-- Right: Chat -->
+      <div class="chat-sidebar">
+        <div class="chat-header">
+          <span>💬</span> Ask BrickBuddy
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-msg from-buddy">
+            <div class="chat-avatar">🤖</div>
+            <div>
+              <div class="chat-text">I'm here to help! Ask me anything about the build or about how robots work! 😊</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <button class="chat-mic" onclick="chatVoice()">🎤</button>
+          <input class="chat-input" id="chat-input" placeholder="Ask a question..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="chat-send" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 3: STEAM Q&A ===== -->
+  <div class="screen qa-screen" id="screen-qa">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goToScreen(2)">&#8592;</button>
+      <div class="logo-small">Brick<span>Buddy</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width: 85%"></div></div>
+      <div class="stage-label">Stage 3: Learn</div>
+    </div>
+    <div class="qa-content">
+      <div class="buddy-chat">
+        <div class="buddy-avatar">🤖</div>
+        <div class="buddy-bubble">
+          Amazing work building your robot! 🎉 Let's explore the <span class="highlight">cool science</span> behind what you just built!
+        </div>
+      </div>
+
+      <div class="qa-topic-bar">
+        <div class="qa-topic s active" onclick="filterQA('s',this)">🔬 Science</div>
+        <div class="qa-topic t" onclick="filterQA('t',this)">💻 Technology</div>
+        <div class="qa-topic e" onclick="filterQA('e',this)">⚙️ Engineering</div>
+        <div class="qa-topic a" onclick="filterQA('a',this)">🎨 Art</div>
+        <div class="qa-topic m" onclick="filterQA('m',this)">🔢 Math</div>
+      </div>
+
+      <div class="qa-card" data-topic="s">
+        <div class="qa-question">🔬 Why does my robot dog fall over?</div>
+        <div class="qa-answer">
+          Great question! Your robot falls over because of something called <strong>center of gravity</strong>. When the heavy parts are too high or too far to one side, gravity pulls them down! That's why we made the base wide and flat — to keep the weight balanced.
+        </div>
+        <div class="qa-fun-fact">🌟 Fun Fact: Real dogs use their tails to help balance, just like we added a tail to your robot!</div>
+      </div>
+
+      <div class="qa-card" data-topic="t">
+        <div class="qa-question">💻 How do real robots see?</div>
+        <div class="qa-answer">
+          Real robots use <strong>sensors</strong> as their eyes! Some use cameras (like the one on a phone), and some use special sensors that measure distance using invisible light. That's why we added the sensor brick to the front — it's your robot dog's eyes!
+        </div>
+        <div class="qa-fun-fact">🌟 Fun Fact: Some robots can see in the dark using infrared light that humans can't see!</div>
+      </div>
+
+      <div class="qa-card" data-topic="e">
+        <div class="qa-question">⚙️ Why did we use different-shaped pieces?</div>
+        <div class="qa-answer">
+          Each shape has a special job! <strong>Flat plates</strong> spread out the weight. <strong>Tall bricks</strong> add height and strength. <strong>Angled pieces</strong> let the legs bend. Engineers choose the right shapes just like this when building real things!
+        </div>
+        <div class="qa-fun-fact">🌟 Fun Fact: Engineers who build real robots go to school for years to learn which shapes work best!</div>
+      </div>
+
+      <div class="qa-card" data-topic="a" style="display:none">
+        <div class="qa-question">🎨 Can I make my robot look different?</div>
+        <div class="qa-answer">
+          Absolutely! Art and design are a huge part of building robots. You can choose different <strong>colors</strong>, add <strong>decorations</strong>, and even change the <strong>shape</strong> of the head to give your robot personality! Every great robot starts with a creative designer.
+        </div>
+        <div class="qa-fun-fact">🌟 Fun Fact: Companies like Pixar use real robots as inspiration for their movie characters!</div>
+      </div>
+
+      <div class="qa-card" data-topic="m" style="display:none">
+        <div class="qa-question">🔢 How many pieces did we use?</div>
+        <div class="qa-answer">
+          Let's count! We used <strong>23 pieces</strong> in total: 8 for the body, 8 for the legs (2 each!), 4 for the head, and 3 for the tail. That's addition! And we used <strong>symmetry</strong> — each side looks the same. Symmetry is when both sides match like a mirror!
+        </div>
+        <div class="qa-fun-fact">🌟 Fun Fact: The word "symmetry" comes from Greek and means "same measure"!</div>
+      </div>
+
+      <div class="summary-card">
+        <h3>🏆 What You Learned Today</h3>
+        <div class="summary-topics">
+          <div class="summary-item"><span class="check">✓</span> Center of Gravity</div>
+          <div class="summary-item"><span class="check">✓</span> Robot Sensors</div>
+          <div class="summary-item"><span class="check">✓</span> Structural Shapes</div>
+          <div class="summary-item"><span class="check">✓</span> Symmetry</div>
+          <div class="summary-item"><span class="check">✓</span> Creative Design</div>
+        </div>
+      </div>
+
+      <button class="next-stage-btn primary" onclick="goToScreen(4)">
+        Finish & Celebrate! 🎊
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 4: Celebration ===== -->
+  <div class="screen celebrate-screen" id="screen-celebrate">
+    <div class="trophy">🏆</div>
+    <h1>You Did It!</h1>
+    <p>You built an amazing Robot Dog and learned so much about science, engineering, and more!</p>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num">23</div>
+        <div class="stat-label">Pieces Used</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">5</div>
+        <div class="stat-label">Steps Done</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">5</div>
+        <div class="stat-label">Things Learned</div>
+      </div>
+    </div>
+    <button class="restart-btn" onclick="goToScreen(0)">Build Again! 🔄</button>
+  </div>
+
+  <div class="confetti-container" id="confetti"></div>
+</div>
+
+<script>
+// --- Screen Navigation ---
+let currentScreen = 0;
+const screens = ['screen-splash','screen-imagine','screen-build','screen-qa','screen-celebrate'];
+
+function goToScreen(idx) {
+  const cur = document.getElementById(screens[currentScreen]);
+  const next = document.getElementById(screens[idx]);
+  cur.classList.remove('active');
+  cur.classList.add(idx > currentScreen ? 'exit-left' : '');
+  setTimeout(() => cur.classList.remove('exit-left'), 600);
+  next.classList.add('active');
+  currentScreen = idx;
+
+  if (idx === 4) launchConfetti();
+}
+
+// --- Stage 1: Imagine ---
+let recording = false;
+
+function showVoice() {
+  hideAllPanels();
+  document.getElementById('voice-panel').classList.add('visible');
+  document.getElementById('card-voice').classList.add('selected');
+}
+function showCamera() {
+  hideAllPanels();
+  document.getElementById('camera-panel').classList.add('visible');
+  document.getElementById('card-camera').classList.add('selected');
+}
+function showTemplates() {
+  hideAllPanels();
+  document.getElementById('template-section').style.display = 'block';
+  document.getElementById('card-template').classList.add('selected');
+}
+function hideAllPanels() {
+  document.getElementById('voice-panel').classList.remove('visible');
+  document.getElementById('camera-panel').classList.remove('visible');
+  document.getElementById('template-section').style.display = 'none';
+  document.querySelectorAll('.input-card').forEach(c => c.classList.remove('selected'));
+}
+
+function toggleRecording() {
+  recording = !recording;
+  const btn = document.getElementById('mic-btn');
+  const wave = document.getElementById('voice-wave');
+  const status = document.getElementById('voice-status');
+  if (recording) {
+    btn.classList.add('recording');
+    btn.textContent = '⏹';
+    wave.style.display = 'flex';
+    status.textContent = 'Listening... tell me about your robot!';
+  } else {
+    btn.classList.remove('recording');
+    btn.textContent = '🎤';
+    wave.style.display = 'none';
+    status.textContent = 'Got it! Processing...';
+    setTimeout(() => simulateChildInput('I want to build a robot dog that can walk and wag its tail!', 'Robot Dog'), 1500);
+  }
+}
+
+function takePhoto() {
+  simulateChildInput('(Showed a drawing of a robot dog with big eyes)', 'Robot Dog');
+}
+
+function selectTemplate(el, name) {
+  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  setTimeout(() => simulateChildInput('I picked: ' + name, name.split(' ').slice(0,2).join(' ')), 500);
+}
+
+function simulateChildInput(text, robotName) {
+  document.getElementById('child-reply-text').textContent = text;
+  document.getElementById('child-reply').style.display = 'block';
+  document.getElementById('robot-choice').textContent = robotName;
+  setTimeout(() => {
+    document.getElementById('ai-understanding').style.display = 'block';
+    document.getElementById('ai-understanding').scrollIntoView({ behavior: 'smooth' });
+  }, 1000);
+}
+
+// --- Stage 2: Build ---
+const steps = [
+  {
+    num: 1, title: 'Build the Body Base', emoji: '🧱',
+    desc: 'Start with a <strong>flat 4x8 plate</strong> — this will be the body of your robot dog! Place it on the table in front of you. This is like building the skeleton that holds everything together.',
+    pieces: [{color:'#EF4444',name:'1x Red 4x8 Plate'},{color:'#3B82F6',name:'2x Blue 2x4 Bricks'}],
+    emotion: null
+  },
+  {
+    num: 2, title: 'Add the Legs', emoji: '🦿',
+    desc: 'Attach <strong>4 tall bricks</strong> to the corners of the base plate — two in front, two in back. These are the legs! Make sure they\'re the <strong>same height</strong> so your robot stands straight.',
+    pieces: [{color:'#F59E0B',name:'4x Yellow 1x2 Tall Bricks'},{color:'#8B5CF6',name:'4x Purple 1x1 Feet Plates'}],
+    emotion: 'Each leg needs to be the same size — this is called symmetry! You can do it! 🌟'
+  },
+  {
+    num: 3, title: 'Build the Head', emoji: '🐕',
+    desc: 'Stack bricks to make the head! Use a <strong>2x3 plate</strong> for the top, then add <strong>round pieces</strong> for the eyes. You need a <strong>sensor brick</strong> to serve as the robot\'s eyes — this is how real robots see the world!',
+    pieces: [{color:'#10B981',name:'1x Green 2x3 Plate'},{color:'#FFFFFF',name:'2x White Round 1x1 (Eyes)'},{color:'#6366F1',name:'1x Sensor Brick'}],
+    emotion: 'The sensor is like giving your robot superpowers — it can sense things around it! 🦸'
+  },
+  {
+    num: 4, title: 'Attach the Tail', emoji: '🎾',
+    desc: 'Add a <strong>hinged piece</strong> to the back so the tail can move! Connect a small chain of 1x1 bricks. The hinge lets the tail wag — just like a real dog! The tail also helps with <strong>balance</strong>.',
+    pieces: [{color:'#EC4899',name:'1x Pink Hinge Plate'},{color:'#F97316',name:'3x Orange 1x1 Round Bricks'}],
+    emotion: null
+  },
+  {
+    num: 5, title: 'Final Touches!', emoji: '✨',
+    desc: 'Add <strong>decorative pieces</strong> to give your robot dog personality! A collar, some color accents, maybe a bone accessory? This is where your <strong>creativity</strong> shines — there\'s no wrong answer!',
+    pieces: [{color:'#EF4444',name:'1x Red 1x4 Collar'},{color:'#F59E0B',name:'1x Gold Star Piece'},{color:'#3B82F6',name:'Accessories of your choice!'}],
+    emotion: 'You\'re almost done! Your robot dog looks AMAZING! 🎉'
+  }
+];
+let currentStep = 0;
+
+function changeStep(dir) {
+  currentStep += dir;
+  if (currentStep < 0) currentStep = 0;
+  if (currentStep >= steps.length) {
+    goToScreen(3);
+    return;
+  }
+  renderStep();
+}
+
+function renderStep() {
+  const s = steps[currentStep];
+  document.getElementById('step-num').textContent = s.num;
+  document.getElementById('step-title').textContent = s.title;
+  document.getElementById('step-emoji').textContent = s.emoji;
+  document.getElementById('step-desc').innerHTML = s.desc;
+  document.getElementById('step-pieces').innerHTML = s.pieces.map(p =>
+    `<div class="piece"><div class="dot" style="background:${p.color}"></div> ${p.name}</div>`
+  ).join('');
+  document.getElementById('prev-btn').disabled = currentStep === 0;
+  document.getElementById('next-btn').textContent = currentStep === steps.length - 1 ? 'Finish! 🎉' : 'Next Step →';
+
+  const banner = document.getElementById('emotion-banner');
+  if (s.emotion) {
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span class="emoji">💪</span><span>${s.emotion}</span>`;
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // Update progress
+  const pct = 30 + (currentStep / steps.length) * 40;
+  document.querySelector('#screen-build .progress-fill').style.width = pct + '%';
+}
+
+// --- Chat ---
+const chatResponses = {
+  'why': 'Great question! In engineering, every part has a purpose. The base is wide so the robot won\'t tip over — that\'s physics! 🔬',
+  'hard': 'Don\'t worry, it\'s totally okay to feel stuck! Let me break it down into smaller steps for you. You\'ve got this! 💪',
+  'help': 'I\'m right here! Tell me which part is tricky and I\'ll explain it differently. There are no silly questions! 😊',
+  'how': 'Let me show you! Look at the picture above — see where the piece connects? Just press it firmly until you hear a click. The studs should line up perfectly!',
+  'what': 'That\'s a great thing to wonder about! Each LEGO piece is designed with tiny bumps called "studs" and tubes underneath that grip them tight. It\'s clever engineering! ⚙️',
+  'cool': 'I know, right?! Building robots is SO cool! Did you know some real robots are built the same way — piece by piece? 🤖',
+  'default': 'That\'s interesting! Keep exploring and asking questions — that\'s what scientists do! Want to know something specific about your robot? 🧪'
+};
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML += `
+    <div class="chat-msg from-child">
+      <div class="chat-avatar">👦</div>
+      <div><div class="chat-text">${text}</div></div>
+    </div>`;
+
+  // Typing indicator
+  const typingId = 'typing-' + Date.now();
+  msgs.innerHTML += `
+    <div class="chat-msg from-buddy" id="${typingId}">
+      <div class="chat-avatar">🤖</div>
+      <div><div class="chat-text"><div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div></div>
+    </div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  setTimeout(() => {
+    const lower = text.toLowerCase();
+    let resp = chatResponses.default;
+    for (const [key, val] of Object.entries(chatResponses)) {
+      if (lower.includes(key)) { resp = val; break; }
+    }
+    // Add STEAM badge
+    let badge = '<div class="steam-badge engineering">⚙️ Engineering</div>';
+    if (lower.includes('why') || lower.includes('fall') || lower.includes('balance')) badge = '<div class="steam-badge science">🔬 Science</div>';
+    if (lower.includes('sensor') || lower.includes('see') || lower.includes('robot')) badge = '<div class="steam-badge tech">💻 Technology</div>';
+    if (lower.includes('color') || lower.includes('look') || lower.includes('cool')) badge = '<div class="steam-badge art">🎨 Art + Design</div>';
+    if (lower.includes('many') || lower.includes('count') || lower.includes('number')) badge = '<div class="steam-badge math">🔢 Math</div>';
+
+    document.getElementById(typingId).outerHTML = `
+      <div class="chat-msg from-buddy">
+        <div class="chat-avatar">🤖</div>
+        <div>
+          <div class="chat-text">${resp}</div>
+          ${badge}
+        </div>
+      </div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  }, 1200);
+}
+
+function chatVoice() {
+  const input = document.getElementById('chat-input');
+  input.value = 'Why does it need 4 legs?';
+  input.focus();
+}
+
+// --- STEAM Q&A Filter ---
+function filterQA(topic, el) {
+  document.querySelectorAll('.qa-topic').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.qa-card').forEach(card => {
+    card.style.display = card.dataset.topic === topic ? 'block' : 'none';
+  });
+}
+
+// --- Confetti ---
+function launchConfetti() {
+  const container = document.getElementById('confetti');
+  const colors = ['#FF6B35','#4ECDC4','#FFE66D','#A855F7','#F472B6','#60A5FA','#34D399','#EF4444'];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + '%';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.width = (6 + Math.random() * 10) + 'px';
+    c.style.height = (6 + Math.random() * 10) + 'px';
+    c.style.animationDuration = (2 + Math.random() * 3) + 's';
+    c.style.animationDelay = Math.random() * 2 + 's';
+    container.appendChild(c);
+  }
+  setTimeout(() => container.innerHTML = '', 6000);
+}
+</script>
+</body>
+</html>
