@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tank Battle - Login</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 50%, #0d1f3c 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+  }
+  .login-card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 400px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .logo { font-size: 56px; margin-bottom: 8px; }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #4ecdc4, #44bd32);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: #888; font-size: 14px; margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; text-align: left; }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 6px;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus {
+    border-color: #4ecdc4;
+  }
+  .btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.2s;
+  }
+  .btn-login {
+    background: linear-gradient(135deg, #4ecdc4, #44bd32);
+    color: #0a1628;
+  }
+  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(78,205,196,0.3); }
+  .btn-register {
+    background: transparent;
+    color: #4ecdc4;
+    border: 1px solid rgba(78,205,196,0.3);
+    margin-top: 10px;
+  }
+  .btn-register:hover { background: rgba(78,205,196,0.1); }
+  .flash-msg {
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .flash-success { background: rgba(68,189,50,0.15); color: #44bd32; border: 1px solid rgba(68,189,50,0.3); }
+  .flash-error { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+</style>
+</head>
+<body>
+  <div class="login-card">
+    <!-- Game title/logo -->
+    <div class="logo">🎯</div>
+    <h1>TANK BATTLE</h1>
+    <p class="subtitle">Enter the battlefield, Commander</p>
+
+    <!-- Flash messages from Flask -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Login form -->
+    <form action="/login" method="POST">
+      <div class="form-group">
+        <label for="login-user">Username</label>
+        <input type="text" id="login-user" name="username" placeholder="Enter your callsign" required>
+      </div>
+      <div class="form-group">
+        <label for="login-pass">Password</label>
+        <input type="password" id="login-pass" name="password" placeholder="Enter your password" required>
+      </div>
+      <button type="submit" class="btn btn-login">Login</button>
+    </form>
+
+    <!-- Register form -->
+    <form action="/register" method="POST">
+      <input type="hidden" name="username" id="reg-user-hidden">
+      <input type="hidden" name="password" id="reg-pass-hidden">
+      <button type="submit" class="btn btn-register" onclick="
+        document.getElementById('reg-user-hidden').value = document.getElementById('login-user').value;
+        document.getElementById('reg-pass-hidden').value = document.getElementById('login-pass').value;
+      ">Create New Account</button>
+    </form>
+  </div>
+</body>
+</html>

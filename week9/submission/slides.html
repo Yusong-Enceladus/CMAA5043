@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BrickBuddy - Milestone Slides</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  @page { size: landscape; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; }
+  .slide {
+    width: 960px; height: 540px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #FFF8F0 0%, #FFF0E5 100%);
+    padding: 36px 48px;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: linear-gradient(135deg, #FF6B35, #FFE66D);
+    border-radius: 50%;
+    opacity: 0.15;
+  }
+  .slide::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; left: -40px;
+    width: 150px; height: 150px;
+    background: linear-gradient(135deg, #4ECDC4, #34D399);
+    border-radius: 50%;
+    opacity: 0.12;
+  }
+  h1 { font-size: 28px; color: #FF6B35; margin-bottom: 4px; font-weight: 800; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .cols { display: flex; gap: 28px; position: relative; z-index: 1; }
+  .col { flex: 1; }
+  h2 { font-size: 15px; color: #2D3436; margin-bottom: 8px; border-bottom: 2px solid #FF6B35; padding-bottom: 4px; }
+  h3 { font-size: 12px; color: #FF6B35; margin: 8px 0 4px; font-weight: 700; }
+  ul { list-style: none; padding: 0; }
+  li { font-size: 11px; color: #555; line-height: 1.5; padding-left: 14px; position: relative; margin-bottom: 2px; }
+  li::before { content: '\25B8'; position: absolute; left: 0; color: #4ECDC4; font-size: 10px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 9px; font-weight: 700; margin-right: 4px; }
+  .tag.s { background: #DBEAFE; color: #2563EB; }
+  .tag.t { background: #F3E8FF; color: #7C3AED; }
+  .tag.e { background: #FEF3C7; color: #D97706; }
+  .tag.a { background: #FCE7F3; color: #DB2777; }
+  .tag.m { background: #D1FAE5; color: #059669; }
+  .demo { margin-top: 10px; padding: 8px 14px; background: white; border-radius: 10px; border: 2px solid #FF6B35; }
+  .demo a { color: #FF6B35; font-weight: 700; font-size: 11px; text-decoration: none; }
+  .footer { position: absolute; bottom: 12px; right: 24px; font-size: 9px; color: #bbb; z-index: 1; }
+  .status { display: flex; gap: 8px; margin-top: 8px; }
+  .status-item { flex: 1; background: white; border-radius: 8px; padding: 6px 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .status-item .label { font-size: 9px; color: #888; }
+  .status-item .val { font-size: 14px; font-weight: 800; color: #FF6B35; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <h1>BrickBuddy</h1>
+  <div class="subtitle">AI-Powered LEGO Robot Building Assistant for Children (6-8) | Yusong HUANG, Jiayi HUANG | CMAA5043 Milestone Check-in</div>
+  <div class="cols">
+    <div class="col">
+      <h2>Project Goal</h2>
+      <ul>
+        <li>Multimodal AI assistant guiding kids through LEGO robot building</li>
+        <li>Voice + camera + template input for natural child expression</li>
+        <li>Personalized step-by-step instructions with emotional support</li>
+        <li>Integrated STEAM education throughout the building process</li>
+      </ul>
+
+      <h2>3-Stage Interaction Flow</h2>
+      <ul>
+        <li><strong>Stage 1 - Imagine:</strong> Child describes/shows robot idea via voice, camera, or templates</li>
+        <li><strong>Stage 2 - Build:</strong> AI generates adaptive instructions + real-time chat support</li>
+        <li><strong>Stage 3 - Learn:</strong> STEAM Q&A summarizes science, tech, engineering, art, math concepts</li>
+      </ul>
+
+      <h3>STEAM Integration</h3>
+      <span class="tag s">Science</span>
+      <span class="tag t">Technology</span>
+      <span class="tag e">Engineering</span>
+      <span class="tag a">Art</span>
+      <span class="tag m">Math</span>
+    </div>
+    <div class="col">
+      <h2>Interface Design (5 Screens)</h2>
+      <ul>
+        <li><strong>Splash:</strong> Welcome mascot + "Let's Build!" CTA</li>
+        <li><strong>Imagine:</strong> Voice/camera/template multimodal input</li>
+        <li><strong>Build:</strong> Step-by-step instructions + AI chat sidebar</li>
+        <li><strong>Learn:</strong> STEAM Q&A cards with fun facts</li>
+        <li><strong>Celebrate:</strong> Confetti + progress stats + learning summary</li>
+      </ul>
+
+      <h2>Progress</h2>
+      <div class="status">
+        <div class="status-item"><div class="val">Done</div><div class="label">Hi-Fi Prototype</div></div>
+        <div class="status-item"><div class="val">Done</div><div class="label">5 Screens</div></div>
+        <div class="status-item"><div class="val">Next</div><div class="label">User Testing</div></div>
+      </div>
+
+      <h3>What's Next</h3>
+      <ul>
+        <li>Integrate real voice recognition (Web Speech API)</li>
+        <li>Connect camera for real-time piece detection</li>
+        <li>User testing with children aged 6-8</li>
+        <li>Expand LEGO model library beyond Robot Dog</li>
+      </ul>
+
+      <div class="demo">
+        <a href="https://yusong-enceladus.github.io/CMAA5043/week9/prototype.html">Live Demo: yusong-enceladus.github.io/CMAA5043/week9/prototype.html</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer">CMAA5043 - Creative Prototyping | Final Project II: Design Milestone | March 2026</div>
+</div>
+</body>
+</html>

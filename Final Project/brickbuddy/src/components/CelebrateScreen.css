@@ -1,0 +1,22 @@
+.celebrate-screen {
+  background: linear-gradient(135deg, #4ECDC4, #34D399, #60A5FA);
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; gap: 16px; padding: 40px; position: relative;
+}
+.confetti-container { position: fixed; inset: 0; pointer-events: none; z-index: 100; overflow: hidden; }
+.confetti-piece { position: absolute; border-radius: 3px; top: -20px; animation: confetti-fall linear forwards; }
+@keyframes confetti-fall { to { top: 110vh; transform: rotate(720deg); } }
+.trophy { font-size: 100px; animation: bounce 2s ease-in-out infinite; }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.celebrate-screen h1 { font-family: 'Fredoka', sans-serif; font-size: 44px; color: white; text-shadow: 3px 3px 0 rgba(0,0,0,0.1); }
+.celebrate-msg { font-size: 18px; color: rgba(255,255,255,0.9); font-weight: 600; max-width: 480px; }
+.stats-row { display: flex; gap: 18px; margin: 16px 0; }
+.stat-card { background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border-radius: 18px; padding: 18px 24px; text-align: center; color: white; }
+.stat-num { font-family: 'Fredoka', sans-serif; font-size: 32px; font-weight: 700; }
+.stat-label { font-size: 13px; font-weight: 600; opacity: 0.85; }
+.restart-btn {
+  margin-top: 12px; padding: 14px 44px; font-size: 18px; font-weight: 700;
+  font-family: 'Fredoka', sans-serif; background: white; color: #4ECDC4;
+  border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 6px 0 rgba(0,0,0,0.1);
+}
+.restart-btn:hover { transform: translateY(-2px); }

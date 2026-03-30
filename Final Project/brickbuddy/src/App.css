@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: #FFF8F0;
+  color: #2D3436;
+  -webkit-font-smoothing: antialiased;
+}

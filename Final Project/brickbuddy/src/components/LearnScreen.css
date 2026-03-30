@@ -1,0 +1,29 @@
+.learn-screen { background: #FFF8F0; min-height: 100vh; }
+.learn-header { display: flex; align-items: center; padding: 12px 24px; background: white; border-bottom: 3px solid #f0f0f0; gap: 16px; }
+.learn-content { max-width: 800px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.topic-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.topic-btn { padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; position: relative; }
+.topic-btn.active { border-color: currentColor; transform: scale(1.05); }
+.topic-btn.s { background: #DBEAFE; color: #2563EB; }
+.topic-btn.t { background: #F3E8FF; color: #7C3AED; }
+.topic-btn.e { background: #FEF3C7; color: #D97706; }
+.topic-btn.a { background: #FCE7F3; color: #DB2777; }
+.topic-btn.m { background: #D1FAE5; color: #059669; }
+.topic-count { position: absolute; top: -6px; right: -6px; background: #EF4444; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+.qa-card { background: white; border-radius: 20px; padding: 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.qa-question { font-family: 'Fredoka', sans-serif; font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+.qa-answer { font-size: 15px; line-height: 1.6; color: #555; }
+.qa-answer strong { color: #FF6B35; }
+.qa-fun-fact { margin-top: 10px; padding: 10px 14px; background: #FFF5EE; border-radius: 10px; border-left: 4px solid #FFE66D; font-size: 13px; font-weight: 600; }
+.summary-card { background: white; border-radius: 20px; padding: 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.summary-card h3 { font-family: 'Fredoka', sans-serif; font-size: 18px; margin-bottom: 14px; }
+.summary-topics { display: flex; flex-wrap: wrap; gap: 8px; }
+.summary-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #f8f8f8; }
+.check { color: #34D399; }
+.finish-btn {
+  padding: 14px 36px; border: none; border-radius: 16px; font-size: 18px; font-weight: 700;
+  font-family: 'Fredoka', sans-serif; cursor: pointer;
+  background: linear-gradient(135deg, #FF6B35, #FF8F65); color: white;
+  box-shadow: 0 4px 16px rgba(255,107,53,0.3); margin: 8px auto; display: block;
+}
+.finish-btn:hover { transform: translateY(-2px); }

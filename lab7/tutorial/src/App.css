@@ -1,0 +1,371 @@
+/* Lab 4 Tutorial – Stylesheet */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+/* ── App Shell ── */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+  color: #333;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.app-shell.dark-mode {
+  background-color: #0d0d1a;
+  color: #e0e0e0;
+}
+
+/* ── Header ── */
+.tutorial-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 3px solid #e94560;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-logo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tutorial-nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.tutorial-nav a {
+  color: #a0a0a0;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.4rem 0.9rem;
+  border-radius: 5px;
+  transition: all 0.2s;
+}
+
+.tutorial-nav a:hover,
+.tutorial-nav a.active {
+  color: #fff;
+  background-color: #e94560;
+}
+
+/* ── Main content ── */
+.home-main,
+.news-main,
+.news-detail-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem;
+  flex: 1;
+}
+
+/* ── Demo sections ── */
+.demo-section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 15px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.demo-section h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.8rem;
+  color: #1a1a2e;
+}
+
+.dark-mode .demo-section h2 {
+  color: #e0e0e0;
+}
+
+.demo-section p {
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+.dark-mode .demo-section p {
+  color: #bbb;
+}
+
+code {
+  background: #f0f0f0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  color: #e94560;
+}
+
+.dark-mode code {
+  background: #2a2a3e;
+}
+
+/* ── Click Demo ── */
+.click-demo {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.click-box {
+  flex: 1;
+  min-width: 200px;
+  padding: 1.5rem;
+  border-radius: 12px;
+  color: #fff;
+  cursor: crosshair;
+  user-select: none;
+  transition: opacity 0.2s;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.click-box:hover { opacity: 0.92; }
+
+.click-box-a { background: linear-gradient(135deg, #667eea, #764ba2); }
+.click-box-b { background: linear-gradient(135deg, #e94560, #c0392b); }
+
+.click-box h4 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+
+.coords {
+  font-size: 0.9rem;
+  font-family: monospace;
+  background: rgba(255,255,255,0.2);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  margin-bottom: 0.3rem;
+}
+
+.coords-hint { font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.3rem; }
+.click-count { font-size: 0.8rem; opacity: 0.75; }
+
+.demo-hint {
+  width: 100%;
+  font-size: 0.88rem;
+  color: #888;
+  margin-top: 0.5rem;
+}
+
+/* ── Context demo ── */
+.context-demo {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.toggle-btn {
+  padding: 0.7rem 1.4rem;
+  background-color: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggle-btn:hover { background-color: #d63850; }
+
+.mode-status {
+  font-size: 1rem;
+  color: #555;
+}
+
+.dark-mode .mode-status { color: #bbb; }
+
+/* ── Button ── */
+.btn {
+  display: inline-block;
+  padding: 0.7rem 1.4rem;
+  background-color: #e94560;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.btn:hover { background-color: #d63850; transform: translateY(-2px); }
+
+/* ── News List ── */
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h2 {
+  font-size: 2rem;
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.dark-mode .page-header h2 { color: #e0e0e0; }
+
+.page-header p {
+  color: #666;
+}
+
+.dark-mode .page-header p { color: #aaa; }
+
+.news-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.news-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.dark-mode .news-item {
+  background: #16213e;
+  border-color: #0f3460;
+}
+
+.news-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.news-link {
+  display: block;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.news-category {
+  display: inline-block;
+  background: #e94560;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 20px;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.news-link h3 {
+  font-size: 1.2rem;
+  color: #1a1a2e;
+  margin-bottom: 0.3rem;
+}
+
+.dark-mode .news-link h3 { color: #e0e0e0; }
+
+.news-date {
+  font-size: 0.82rem;
+  color: #999;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.news-link p {
+  color: #555;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.dark-mode .news-link p { color: #bbb; }
+
+.read-more {
+  font-size: 0.88rem;
+  color: #e94560;
+  font-weight: 600;
+}
+
+/* ── News Detail ── */
+.back-link {
+  display: inline-block;
+  color: #e94560;
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  transition: color 0.2s;
+}
+
+.back-link:hover { color: #d63850; }
+
+.article-content {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 15px;
+  padding: 2rem;
+}
+
+.dark-mode .article-content {
+  background: #16213e;
+  border-color: #0f3460;
+}
+
+.article-content h2 {
+  font-size: 1.8rem;
+  color: #1a1a2e;
+  margin: 0.5rem 0;
+}
+
+.dark-mode .article-content h2 { color: #e0e0e0; }
+
+.article-date {
+  color: #999;
+  font-size: 0.88rem;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+.article-body {
+  color: #555;
+  line-height: 1.8;
+  font-size: 1.05rem;
+}
+
+.dark-mode .article-body { color: #ccc; }
+
+/* ── Footer ── */
+.tutorial-footer {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-top: 3px solid #e94560;
+  color: #a0a0a0;
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: auto;
+}
+
+@media (max-width: 600px) {
+  .click-demo { flex-direction: column; }
+  .context-demo { flex-direction: column; align-items: flex-start; }
+  .header-inner { flex-direction: column; gap: 0.5rem; }
+}
