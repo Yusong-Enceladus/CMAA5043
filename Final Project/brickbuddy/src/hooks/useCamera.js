@@ -2,7 +2,7 @@
  * useCamera — Custom hook for accessing device camera via getUserMedia.
  * Lets children show their LEGO pieces or drawings to the AI assistant.
  */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export default function useCamera() {
   const [isActive, setIsActive] = useState(false);
@@ -49,6 +49,16 @@ export default function useCamera() {
     stopCamera();
     return dataUrl;
   }, [stopCamera]);
+
+  // Cleanup on unmount — stop camera stream to prevent privacy leak
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
 
   return { videoRef, isActive, photo, error, startCamera, stopCamera, takePhoto, setPhoto };
 }

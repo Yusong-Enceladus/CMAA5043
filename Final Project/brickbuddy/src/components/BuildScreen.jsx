@@ -2,33 +2,31 @@
  * BuildScreen — Stage 2: Step-by-step building instructions + AI chat sidebar.
  * Features emotional support banners and STEAM-tagged chat responses.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
+import { getAIResponse, getStepWelcome } from '../services/chatEngine';
+import LegoViewer3D from './LegoViewer3D';
 import './BuildScreen.css';
 
-// Simple AI response generator based on keywords
-function getAIResponse(text) {
-  const lower = text.toLowerCase();
-  if (lower.includes('why') || lower.includes('fall'))
-    return { text: 'Great question! Your robot might fall because of center of gravity. Keep the heavy parts low and the base wide! 🔬', tag: 'science' };
-  if (lower.includes('hard') || lower.includes('stuck') || lower.includes('can\'t'))
-    return { text: 'Don\'t worry! It\'s totally okay to feel stuck. Let me break it down smaller. You\'ve got this! 💪', tag: null };
-  if (lower.includes('help'))
-    return { text: 'I\'m right here! Tell me which part is tricky and I\'ll explain differently. No silly questions! 😊', tag: null };
-  if (lower.includes('how') || lower.includes('connect') || lower.includes('attach'))
-    return { text: 'Press the piece firmly until you hear a click. The studs on top fit into the tubes underneath — that\'s clever engineering! ⚙️', tag: 'engineering' };
-  if (lower.includes('sensor') || lower.includes('see') || lower.includes('eye'))
-    return { text: 'Robots use sensors as their eyes! Some use cameras, some use infrared light. Your sensor brick is the robot\'s way of seeing! 💻', tag: 'technology' };
-  if (lower.includes('color') || lower.includes('look') || lower.includes('pretty'))
-    return { text: 'Art and design are huge in robotics! Colors affect how people feel — red = energy, blue = calm. Make your robot express YOU! 🎨', tag: 'art' };
-  if (lower.includes('many') || lower.includes('count') || lower.includes('number'))
-    return { text: 'Let\'s count! We use symmetry — both sides match like a mirror. That\'s math in action! 🔢', tag: 'math' };
-  return { text: 'That\'s interesting! Keep exploring and asking questions — that\'s what scientists do! Want to know more about your robot? 🧪', tag: 'science' };
-}
-
 export default function BuildScreen() {
-  const { selectedModel, currentStep, nextStep, prevStep, setStage, chatHistory, addChat } = useBuild();
+  const { selectedModel, currentStep, nextStep, prevStep, setStage, chatHistory, addChat, progress } = useBuild();
   const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef(null);
+  const prevStepRef = useRef(currentStep);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
+
+  // Send welcome message when step changes
+  useEffect(() => {
+    if (prevStepRef.current !== currentStep && selectedModel) {
+      const welcome = getStepWelcome(selectedModel, currentStep);
+      if (welcome) addChat('buddy', welcome.text, welcome.tag);
+    }
+    prevStepRef.current = currentStep;
+  }, [currentStep, selectedModel]);
 
   if (!selectedModel) return null;
   const step = selectedModel.steps[currentStep];
@@ -37,8 +35,8 @@ export default function BuildScreen() {
   const handleSend = () => {
     if (!chatInput.trim()) return;
     addChat('child', chatInput);
-    const response = getAIResponse(chatInput);
-    setTimeout(() => addChat('buddy', response.text, response.tag), 800);
+    const response = getAIResponse(chatInput, selectedModel, currentStep);
+    setTimeout(() => addChat('buddy', response.text, response.tag), 600);
     setChatInput('');
   };
 
@@ -53,7 +51,7 @@ export default function BuildScreen() {
         <button className="back-btn" onClick={() => setStage('imagine')}>←</button>
         <span className="logo-small">Brick<span>Buddy</span></span>
         <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${30 + (currentStep / selectedModel.steps.length) * 40}%` }} />
+          <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <span className="stage-label">Stage 2: Build</span>
       </div>
@@ -73,9 +71,9 @@ export default function BuildScreen() {
             <div className="step-title">{step.title}</div>
           </div>
 
-          <div className="step-visual">
-            <div className="lego-preview">{step.emoji}</div>
-            <div className="label-3d">3D View</div>
+          <div className="step-visual viewer-3d">
+            <LegoViewer3D modelId={selectedModel.id} currentStep={currentStep} />
+            <div className="label-3d">3D View — Drag to Rotate</div>
           </div>
 
           <div className="step-description" dangerouslySetInnerHTML={{ __html: step.desc }} />
@@ -124,6 +122,7 @@ export default function BuildScreen() {
                 </div>
               </div>
             ))}
+            <div ref={chatEndRef} />
           </div>
           <div className="chat-input-bar">
             <input

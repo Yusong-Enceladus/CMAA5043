@@ -2,7 +2,7 @@
  * BuildContext — Global state for the building session.
  * Tracks which model is selected, current step, chat history, and STEAM progress.
  */
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 import { robotModels } from '../data/models';
 
 const BuildContext = createContext();
@@ -16,10 +16,13 @@ export function BuildProvider({ children }) {
     science: 0, technology: 0, engineering: 0, art: 0, math: 0
   });
 
-  // Select a robot model by ID
+  // Select a robot model by ID — resets step/chat/progress for a clean session
   const selectModel = (modelId) => {
     const model = robotModels.find(m => m.id === modelId);
     setSelectedModel(model);
+    setCurrentStep(0);
+    setChatHistory([]);
+    setSteamProgress({ science: 0, technology: 0, engineering: 0, art: 0, math: 0 });
   };
 
   // Navigate build steps
@@ -40,6 +43,17 @@ export function BuildProvider({ children }) {
     }
   };
 
+  // Compute real progress percentage across all stages
+  const progress = useMemo(() => {
+    const stages = { splash: 0, imagine: 15, build: 25, learn: 85, celebrate: 100 };
+    const base = stages[stage] || 0;
+    if (stage === 'build' && selectedModel) {
+      const stepProgress = (currentStep / selectedModel.steps.length) * 55; // 25% to 80%
+      return Math.round(base + stepProgress);
+    }
+    return base;
+  }, [stage, currentStep, selectedModel]);
+
   // Reset everything for a new session
   const resetSession = () => {
     setStage('splash');
@@ -56,6 +70,7 @@ export function BuildProvider({ children }) {
       currentStep, setCurrentStep, nextStep, prevStep,
       chatHistory, addChat,
       steamProgress, setSteamProgress,
+      progress,
       resetSession
     }}>
       {children}

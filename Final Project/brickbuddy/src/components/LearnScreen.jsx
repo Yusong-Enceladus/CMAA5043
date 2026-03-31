@@ -15,7 +15,7 @@ const topics = [
 ];
 
 export default function LearnScreen() {
-  const { setStage, steamProgress } = useBuild();
+  const { setStage, steamProgress, progress } = useBuild();
   const [activeTopic, setActiveTopic] = useState('science');
 
   const facts = steamFacts[activeTopic] || [];
@@ -25,7 +25,7 @@ export default function LearnScreen() {
       <div className="learn-header">
         <button className="back-btn" onClick={() => setStage('build')}>←</button>
         <span className="logo-small">Brick<span>Buddy</span></span>
-        <div className="progress-bar"><div className="progress-fill" style={{ width: '85%' }} /></div>
+        <div className="progress-bar"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
         <span className="stage-label">Stage 3: Learn</span>
       </div>
 
@@ -59,9 +59,18 @@ export default function LearnScreen() {
         <div className="summary-card">
           <h3>🏆 What You Learned Today</h3>
           <div className="summary-topics">
-            {['Center of Gravity', 'Robot Sensors', 'Structural Shapes', 'Symmetry', 'Creative Design'].map(item => (
-              <div key={item} className="summary-item"><span className="check">✓</span> {item}</div>
-            ))}
+            {steamProgress.science > 0 && <div className="summary-item"><span className="check">✓</span> Center of Gravity & Physics</div>}
+            {steamProgress.technology > 0 && <div className="summary-item"><span className="check">✓</span> Robot Sensors & Vision</div>}
+            {steamProgress.engineering > 0 && <div className="summary-item"><span className="check">✓</span> Structural Engineering</div>}
+            {steamProgress.art > 0 && <div className="summary-item"><span className="check">✓</span> Creative Design & Color</div>}
+            {steamProgress.math > 0 && <div className="summary-item"><span className="check">✓</span> Symmetry & Patterns</div>}
+            {Object.values(steamProgress).every(v => v === 0) && (
+              <>
+                <div className="summary-item"><span className="check">✓</span> Building step-by-step</div>
+                <div className="summary-item"><span className="check">✓</span> Following instructions</div>
+                <div className="summary-item"><span className="check">✓</span> Creativity & patience</div>
+              </>
+            )}
           </div>
         </div>
 

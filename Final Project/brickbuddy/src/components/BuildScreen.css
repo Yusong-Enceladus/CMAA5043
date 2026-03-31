@@ -24,10 +24,12 @@
 .step-visual {
   width: 100%; aspect-ratio: 16/10; background: linear-gradient(135deg, #FFF5EE, #FFF0E5);
   border-radius: 16px; display: flex; align-items: center; justify-content: center;
-  margin-bottom: 16px; border: 2px dashed #FFD4B8; position: relative;
+  margin-bottom: 16px; border: 2px solid #FFD4B8; position: relative; overflow: hidden;
 }
+.step-visual.viewer-3d { cursor: grab; }
+.step-visual.viewer-3d:active { cursor: grabbing; }
 .lego-preview { font-size: 72px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1)); }
-.label-3d { position: absolute; bottom: 8px; right: 12px; background: #FF6B35; color: white; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+.label-3d { position: absolute; bottom: 8px; right: 12px; background: rgba(255,107,53,0.85); color: white; padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; pointer-events: none; z-index: 2; backdrop-filter: blur(4px); }
 .step-description { font-size: 16px; line-height: 1.6; color: #555; margin-bottom: 14px; }
 .step-description strong { color: #FF6B35; }
 .pieces-needed { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }

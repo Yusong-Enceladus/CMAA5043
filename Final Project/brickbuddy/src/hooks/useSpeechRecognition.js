@@ -3,7 +3,7 @@
  * Provides real voice-to-text functionality for children to describe their robot.
  * Falls back gracefully if browser doesn't support Speech API.
  */
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export default function useSpeechRecognition() {
   const [transcript, setTranscript] = useState('');
@@ -55,6 +55,16 @@ export default function useSpeechRecognition() {
   }, []);
 
   const resetTranscript = useCallback(() => setTranscript(''), []);
+
+  // Cleanup on unmount — stop recognition to prevent lingering microphone access
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
 
   return { transcript, isListening, isSupported, startListening, stopListening, resetTranscript };
 }
