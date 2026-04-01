@@ -133,3 +133,24 @@ button.template-card {
 button.input-card:focus-visible, button.template-card:focus-visible {
   outline: 3px solid #FF6B35; outline-offset: 2px;
 }
+
+/* Tablet */
+@media (max-width: 768px) {
+  .imagine-content { padding: 16px; }
+  .input-cards { gap: 10px; }
+  .input-card { min-width: 140px; padding: 18px 14px; }
+  .buddy-bubble { font-size: 15px; }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .imagine-header { padding: 10px 16px; gap: 10px; }
+  .logo-small { font-size: 18px; }
+  .input-cards { flex-direction: column; align-items: stretch; }
+  .input-card { max-width: none; min-width: 0; padding: 16px; flex-direction: row; gap: 12px; text-align: left; border-radius: 18px; }
+  .input-icon { font-size: 30px; margin-bottom: 0; }
+  .buddy-bubble { font-size: 14px; padding: 12px 16px; }
+  .mic-btn { width: 60px; height: 60px; font-size: 26px; }
+  .camera-preview { max-width: 100%; }
+  .start-build-btn { font-size: 16px; padding: 12px 28px; }
+}

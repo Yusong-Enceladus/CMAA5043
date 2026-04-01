@@ -50,4 +50,16 @@
 }
 .splash-btn:hover { transform: translateY(-2px); }
 .splash-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.08); }
+.splash-resume {
+  font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 600;
+  padding: 8px 20px; background: rgba(255,255,255,0.15); border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
 .splash-age { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 8px; }
+
+@media (max-width: 600px) {
+  .splash-title { font-size: 36px; }
+  .splash-subtitle { font-size: 15px; }
+  .splash-mascot { width: 130px; height: 130px; font-size: 65px; }
+  .splash-btn { padding: 14px 40px; font-size: 18px; }
+}

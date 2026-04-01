@@ -3,6 +3,7 @@
  * Final Project for CMAA5043 | Yusong, Jiayi
  */
 import { BuildProvider, useBuild } from './context/BuildContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import SplashScreen from './components/SplashScreen';
 import ImagineScreen from './components/ImagineScreen';
 import BuildScreen from './components/BuildScreen';
@@ -25,8 +26,10 @@ function AppRouter() {
 
 export default function App() {
   return (
-    <BuildProvider>
-      <AppRouter />
-    </BuildProvider>
+    <ErrorBoundary>
+      <BuildProvider>
+        <AppRouter />
+      </BuildProvider>
+    </ErrorBoundary>
   );
 }
