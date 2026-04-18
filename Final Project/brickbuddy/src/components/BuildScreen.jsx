@@ -1,41 +1,43 @@
 /**
  * BuildScreen — Stage 2: Step-by-step building instructions + AI chat sidebar.
- * Features 3D viewer, emotional support banners, STEAM-tagged chat, sound effects,
- * and accessible controls.
+ *
+ * The chat is the modification surface. When the child types something like
+ * "make it blue" or "redo step 3", the message is handled as a model-change
+ * intent (not a normal Q&A). All other messages fall through to the AI/rules
+ * chat engine. The standalone "Edit This Step" button has been removed — all
+ * editing happens through chat as requested.
  */
 import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { getSmartAIResponse, getStepWelcome, hasAIKey } from '../services/chatEngine';
 import { regenerateStep } from '../services/aiService';
+import { detectModIntent, recolorFromText } from '../services/localRobotGen';
 import { playClick, playStepComplete, playChatReceive } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
-import StepEditor from './StepEditor';
 import './BuildScreen.css';
 
 export default function BuildScreen() {
   const {
     selectedModel, currentStep, nextStep, prevStep, setStage,
     chatHistory, addChat, progress, soundEnabled,
-    updateStepParts, updateSelectedModel,
+    setSelectedModel, updateSelectedModel,
   } = useBuild();
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
   const chatEndRef = useRef(null);
   const prevStepRef = useRef(currentStep);
 
-  // Auto-scroll chat to bottom (scoped to chat container, not page)
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [chatHistory, isTyping]);
 
-  // Send welcome message when step changes
   useEffect(() => {
     if (prevStepRef.current !== currentStep && selectedModel) {
       const welcome = getStepWelcome(selectedModel, currentStep);
       if (welcome) addChat('buddy', welcome.text, welcome.tag);
     }
     prevStepRef.current = currentStep;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, selectedModel]);
 
   if (!selectedModel) {
@@ -46,7 +48,7 @@ export default function BuildScreen() {
           <span className="logo-small">Brick<span>Buddy</span></span>
         </div>
         <div style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ fontSize: 18, fontWeight: 600 }}>No robot selected. Let's go pick one!</p>
+          <p style={{ fontSize: 18, fontWeight: 600 }}>No robot selected. Let&apos;s go pick one!</p>
           <button className="step-btn next" onClick={() => setStage('imagine')} style={{ marginTop: 16 }}>
             Choose a Robot
           </button>
@@ -58,6 +60,7 @@ export default function BuildScreen() {
   const step = selectedModel.steps[currentStep];
   const isLastStep = currentStep === selectedModel.steps.length - 1;
 
+  /* ───────── Chat handler with in-chat model modification ───────── */
   const handleSend = async () => {
     const text = chatInput.trim();
     if (!text || isTyping) return;
@@ -67,6 +70,46 @@ export default function BuildScreen() {
     setIsTyping(true);
 
     try {
+      // 1. Detect a modification intent first.
+      const intent = detectModIntent(text, selectedModel);
+
+      if (intent?.kind === 'recolor') {
+        const result = recolorFromText(selectedModel, text);
+        if (result) {
+          setSelectedModel(result.model);
+          if (soundEnabled) playStepComplete();
+          addChat(
+            'buddy',
+            `${result.changed} across every step. Your ${selectedModel.name} looks different now — tell me if you want another change!`,
+            'art',
+          );
+          return;
+        }
+        // If we couldn't find colors, fall through to normal chat.
+      }
+
+      if (intent?.kind === 'regen-step') {
+        addChat('buddy', `Rebuilding step ${intent.stepIndex + 1} with a fresh idea\u2026`, null);
+        try {
+          const fresh = await regenerateStep(selectedModel, intent.stepIndex);
+          updateSelectedModel((m) => {
+            const copy = structuredClone(m);
+            copy.steps[intent.stepIndex] = { ...copy.steps[intent.stepIndex], ...fresh };
+            return copy;
+          });
+          if (soundEnabled) playStepComplete();
+          addChat('buddy', `Done! Step ${intent.stepIndex + 1} got a makeover. Check the 3D view!`, 'engineering');
+        } catch {
+          addChat(
+            'buddy',
+            `I couldn\u2019t reshape step ${intent.stepIndex + 1} just now. Try a simpler request like "make it blue" instead!`,
+            null,
+          );
+        }
+        return;
+      }
+
+      // 2. Not a modification — normal Q&A chat.
       const response = await getSmartAIResponse(text, selectedModel, currentStep, chatHistory);
       addChat('buddy', response.text, response.tag);
       if (soundEnabled) playChatReceive();
@@ -86,44 +129,6 @@ export default function BuildScreen() {
     prevStep();
   };
 
-  // ─── Editor actions (apply immutable updates to the current step's parts) ─
-  const deletePart = (partIndex) => {
-    if (soundEnabled) playClick();
-    updateStepParts(currentStep, (parts) => parts.filter((_, i) => i !== partIndex));
-  };
-
-  const recolorPart = (partIndex, newColor) => {
-    updateStepParts(currentStep, (parts) =>
-      parts.map((p, i) => (i === partIndex ? { ...p, color: newColor } : p)),
-    );
-  };
-
-  const addPart = (newPart) => {
-    if (soundEnabled) playClick();
-    updateStepParts(currentStep, (parts) => [...parts, newPart]);
-  };
-
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState(null);
-  const regenerateCurrentStep = async () => {
-    setRegenError(null);
-    setRegenerating(true);
-    try {
-      const fresh = await regenerateStep(selectedModel, currentStep);
-      updateSelectedModel((m) => {
-        const copy = structuredClone(m);
-        copy.steps[currentStep] = { ...copy.steps[currentStep], ...fresh };
-        return copy;
-      });
-      if (soundEnabled) playStepComplete();
-    } catch (err) {
-      setRegenError("Couldn't regenerate that step right now. Try again in a moment.");
-      if (import.meta.env.DEV) console.warn('[regen]', err);
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
   return (
     <div className="build-screen" role="main" aria-label={`Building ${selectedModel.name}`}>
       <header className="build-header">
@@ -138,7 +143,6 @@ export default function BuildScreen() {
       </header>
 
       <div className="build-layout">
-        {/* Left: Instructions */}
         <section className="instruction-panel" aria-label="Build instructions">
           {step.tip && (
             <div className="emotion-banner" role="note">
@@ -153,7 +157,7 @@ export default function BuildScreen() {
           </div>
 
           <div className="step-visual viewer-3d" aria-label={`3D view of ${selectedModel.name} at step ${step.num}`}>
-            <LegoViewer3D modelId={selectedModel.id} currentStep={currentStep} />
+            <LegoViewer3D model={selectedModel} currentStep={currentStep} />
             <div className="label-3d" aria-hidden="true">3D View &mdash; Drag to Rotate</div>
           </div>
 
@@ -172,30 +176,6 @@ export default function BuildScreen() {
             ))}
           </div>
 
-          {editorOpen && (
-            <StepEditor
-              parts={step.newParts || []}
-              onDelete={deletePart}
-              onRecolor={recolorPart}
-              onAdd={addPart}
-              onRegenerate={regenerateCurrentStep}
-              regenerating={regenerating}
-              error={regenError}
-              primaryColor={selectedModel.color}
-            />
-          )}
-
-          <div className="edit-toggle-row">
-            <button
-              className={`edit-toggle-btn ${editorOpen ? 'open' : ''}`}
-              onClick={() => setEditorOpen((v) => !v)}
-              aria-expanded={editorOpen}
-              aria-label={editorOpen ? 'Close step editor' : 'Open step editor'}
-            >
-              {editorOpen ? '\u2715 Close Editor' : '\u{1F6E0} Edit This Step'}
-            </button>
-          </div>
-
           <nav className="step-nav" aria-label="Step navigation">
             <button className="step-btn prev" onClick={handlePrev} disabled={currentStep === 0} aria-label="Previous step">
               &larr; Previous
@@ -206,7 +186,6 @@ export default function BuildScreen() {
           </nav>
         </section>
 
-        {/* Right: Chat */}
         <aside className="chat-sidebar" aria-label="Chat with BrickBuddy">
           <div className="chat-header">
             &#x1F4AC; Ask BrickBuddy
@@ -216,7 +195,7 @@ export default function BuildScreen() {
             <div className="chat-msg from-buddy">
               <div className="chat-avatar" aria-hidden="true">&#x1F916;</div>
               <div className="chat-text">
-                Hey! I'm here to help you build your {selectedModel.name} {selectedModel.emoji}! Ask me anything about the build or about how robots work! &#x1F60A;
+                Hey! I&apos;m here to help you build your {selectedModel.name} {selectedModel.emoji}! Ask me anything, or say something like <em>&ldquo;make it blue&rdquo;</em> or <em>&ldquo;redo step 3&rdquo;</em> to change the model. &#x1F60A;
               </div>
             </div>
             {chatHistory.map((msg, i) => (
@@ -250,9 +229,9 @@ export default function BuildScreen() {
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder={isTyping ? 'BrickBuddy is thinking...' : 'Ask a question...'}
+              placeholder={isTyping ? 'BrickBuddy is thinking...' : 'Ask a question or change the model...'}
               disabled={isTyping}
-              aria-label="Type a question for BrickBuddy"
+              aria-label="Message BrickBuddy"
             />
             <button className="chat-send" onClick={handleSend} disabled={isTyping} aria-label="Send message">&#x27A4;</button>
           </div>

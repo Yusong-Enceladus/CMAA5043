@@ -1,19 +1,26 @@
 /**
  * ImagineScreen — The home hub. Three entry points:
- *   1. Talk to Me  — voice → transcript → Retry/Confirm → AI generates a custom robot.
- *   2. Show Me     — camera → photo → Retry/Confirm → AI generates a custom robot from the photo.
- *   3. Pick One    — 3 ready-made presets (no AI). From this mode you can still hop over
- *                    to Talk/Show to generate a custom build.
+ *   1. Talk to Me  — voice → transcript → Confirm → AI generates a custom robot.
+ *   2. Show Me     — camera → photo → Retake/Confirm → AI generates from photo.
+ *   3. Pick One    — 3 ready-made presets; can also jump to Talk/Show.
  *
- * Talk/Show are "Turing-complete" paths: whatever the child says or shows, the AI designs
- * a brand-new robot around it. Pick One is the instant-start path that uses hand-authored
- * presets with detailed, anatomically-faithful 3D geometry.
+ * Voice UX: a single mic button whose icon represents state
+ *   - 🎤  empty (waiting for input) → tap to start recording
+ *   - ⏹   listening → tap to stop
+ *   - 🔄  has transcript → tap to re-record (replaces the old Retry button)
+ * The only other control is the central Confirm button, which appears once a
+ * transcript exists.
+ *
+ * AI fallback: if both /api/chat paths fail (throttled free-tier, offline,
+ * server down), we generate a custom robot LOCALLY so the child always gets
+ * a build. This was added after OpenRouter's free tier kept rate-limiting.
  */
 import { useEffect, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { robotModels } from '../data/models';
 import { analyzePhoto } from '../services/imageAnalyzer';
 import { generateFullRobot, generateCustomRobot, customizeModel } from '../services/aiService';
+import { generateLocally } from '../services/localRobotGen';
 import { playClick, playSuccess } from '../services/soundEffects';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useCamera from '../hooks/useCamera';
@@ -21,7 +28,7 @@ import './ImagineScreen.css';
 
 export default function ImagineScreen() {
   const { selectModel, setStage, progress, soundEnabled } = useBuild();
-  const [mode, setMode] = useState(null); // null | 'voice' | 'camera' | 'pick'
+  const [mode, setMode] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null);
   const [aiResponse, setAiResponse] = useState('');
@@ -30,12 +37,10 @@ export default function ImagineScreen() {
   const speech = useSpeechRecognition();
   const camera = useCamera();
 
-  // Bind the stream to the <video> element when it mounts in the DOM.
   useEffect(() => {
     if (camera.isActive) camera.attachVideoToStream();
   }, [camera.isActive, camera.attachVideoToStream]);
 
-  /* ───────── Mode switching ───────── */
   const handleModeSelect = (next) => {
     if (soundEnabled) playClick();
     camera.stopCamera();
@@ -56,27 +61,21 @@ export default function ImagineScreen() {
     setStage('splash');
   };
 
-  /* ───────── Voice flow ───────── */
-  const handleVoiceToggle = () => {
+  /* ───────── Voice flow (single-button icon state) ───────── */
+  const hasTranscript = speech.transcript.trim().length > 0;
+
+  const handleMicTap = () => {
     if (soundEnabled) playClick();
     if (speech.isListening) {
       speech.stopListening();
     } else {
+      // Either "start fresh" OR "re-record". In both cases, clear state and start.
       speech.resetTranscript();
       speech.clearError();
       setAiResponse('');
       setGenError(null);
       speech.startListening();
     }
-  };
-
-  const handleVoiceRetry = () => {
-    if (soundEnabled) playClick();
-    speech.resetTranscript();
-    speech.clearError();
-    setAiResponse('');
-    setGenError(null);
-    speech.startListening();
   };
 
   const handleVoiceConfirm = async () => {
@@ -111,8 +110,9 @@ export default function ImagineScreen() {
       const description = `A robot inspired by this picture. Detected: ${analysis.reason}.`;
       await generateFromText(description, analysis);
     } catch {
-      setGenError("I couldn't look at that photo. Try taking another one, or pick a preset!");
-      setGenerating(false);
+      // Even image analysis failed — still fall back to local generation with a
+      // generic description so the build flow never dead-ends.
+      await generateFromText('a robot inspired by my photo');
     }
   };
 
@@ -130,8 +130,7 @@ export default function ImagineScreen() {
       ? `${text} (Hint: looks closest to a ${photoAnalysis.modelId}.)`
       : text;
 
-    let quotaHint = null;
-
+    // Path 1: full AI geometry.
     try {
       const custom = await generateFullRobot(prompt);
       selectModel(custom);
@@ -142,10 +141,9 @@ export default function ImagineScreen() {
       );
       setGenerating(false);
       return;
-    } catch (err) {
-      if (err.hint) quotaHint = err.hint;
-    }
+    } catch { /* fall through */ }
 
+    // Path 2: AI blueprint + recolor a preset.
     try {
       const blueprint = await generateCustomRobot(prompt);
       const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
@@ -156,13 +154,23 @@ export default function ImagineScreen() {
         `Here's a ${custom.name} ${custom.emoji} inspired by your idea! ${custom.description} ` +
         `It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
       );
-    } catch (err) {
-      if (err.hint) quotaHint = err.hint;
-      setGenError(
-        quotaHint
-          ? `AI is taking a break: ${quotaHint} Tap "Pick One" for an instant build!`
-          : "I couldn't dream that up right now. Try again, or use Pick One!",
+      setGenerating(false);
+      return;
+    } catch { /* fall through to local fallback */ }
+
+    // Path 3: local, offline fallback. ALWAYS succeeds.
+    try {
+      const custom = generateLocally(text, photoAnalysis);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `A brand-new ${custom.name} ${custom.emoji} — ${custom.description} ` +
+        `${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
       );
+    } catch (err) {
+      // Local can only fail if data/models.js is missing — true last-resort.
+      setGenError('Something went wrong. Try Pick One instead!');
+      if (import.meta.env.DEV) console.error('[Imagine] all paths failed:', err);
     } finally {
       setGenerating(false);
     }
@@ -187,7 +195,6 @@ export default function ImagineScreen() {
     setStage('build');
   };
 
-  /* ───────── Rendering ───────── */
   const showStartBtn = aiResponse && !generating && !genError && (
     (mode === 'pick' && selectedPreset) ||
     (mode === 'voice' && !speech.isListening) ||
@@ -250,8 +257,8 @@ export default function ImagineScreen() {
           <VoicePanel
             speech={speech}
             generating={generating}
-            onToggle={handleVoiceToggle}
-            onRetry={handleVoiceRetry}
+            hasTranscript={hasTranscript}
+            onMicTap={handleMicTap}
             onConfirm={handleVoiceConfirm}
           />
         )}
@@ -295,19 +302,25 @@ export default function ImagineScreen() {
 }
 
 /* ─────────────────────── Voice Panel ─────────────────────── */
-function VoicePanel({ speech, generating, onToggle, onRetry, onConfirm }) {
-  const hasTranscript = speech.transcript.trim().length > 0;
-  const canConfirm = hasTranscript && !speech.isListening && !generating;
-  const canRetry = (hasTranscript || speech.error) && !speech.isListening && !generating;
+function VoicePanel({ speech, generating, hasTranscript, onMicTap, onConfirm }) {
+  const micState = speech.isListening
+    ? 'listening'
+    : hasTranscript
+      ? 'has-content'
+      : 'empty';
+  const micIcon = {
+    empty:       '\u{1F3A4}', // 🎤 — waiting for input
+    listening:   '\u23F9',    // ⏹  — tap to stop
+    'has-content': '\u{1F504}', // 🔄 — tap to re-record
+  }[micState];
+  const micLabel = {
+    empty:       'Start recording',
+    listening:   'Stop recording',
+    'has-content': 'Re-record',
+  }[micState];
 
   return (
     <section className="voice-panel" aria-label="Voice input">
-      <h3>Tell me about your dream robot!</h3>
-      <p className="panel-hint">
-        Use <strong>this mic button</strong> (not your system voice bar).<br />
-        Tap it, speak your idea, then press <strong>Confirm</strong>.
-      </p>
-
       {!speech.isSupported && (
         <p className="warning" role="alert">
           Voice isn&apos;t supported in this browser. Try Chrome, Edge, or Safari &mdash; or use <strong>Show Me</strong> / <strong>Pick One</strong>.
@@ -327,53 +340,35 @@ function VoicePanel({ speech, generating, onToggle, onRetry, onConfirm }) {
           )}
 
           <button
-            className={`mic-btn ${speech.isListening ? 'recording' : ''}`}
-            onClick={onToggle}
+            className={`mic-btn state-${micState}`}
+            onClick={onMicTap}
             disabled={generating}
-            aria-label={speech.isListening ? 'Stop recording' : 'Start recording'}
+            aria-label={micLabel}
+            title={micLabel}
           >
-            {speech.isListening ? '\u23F9' : '\u{1F3A4}'}
+            {micIcon}
           </button>
 
-          <p className="voice-status">
-            {speech.isListening
-              ? 'Listening\u2026 tell me about your robot!'
-              : hasTranscript
-                ? 'Here is what I heard:'
-                : 'Tap the microphone and start talking.'}
-          </p>
-
-          {hasTranscript && (
+          {hasTranscript && !speech.isListening && (
             <div className="transcript-box" aria-live="polite">
               &ldquo;{speech.transcript}&rdquo;
             </div>
           )}
 
-          {(canRetry || canConfirm) && (
-            <div className="confirm-row">
-              <button
-                className="retry-btn"
-                onClick={onRetry}
-                disabled={!canRetry}
-                aria-label="Record again"
-              >
-                &#x1F504; Retry
-              </button>
-              <button
-                className="confirm-btn"
-                onClick={onConfirm}
-                disabled={!canConfirm}
-                aria-label="Use this and build"
-              >
-                {generating ? 'Designing\u2026' : 'Confirm \u2713'}
-              </button>
-            </div>
+          {hasTranscript && !speech.isListening && (
+            <button
+              className="confirm-btn"
+              onClick={onConfirm}
+              disabled={generating}
+              aria-label="Use this and build"
+            >
+              {generating ? 'Designing\u2026' : 'Confirm \u2713'}
+            </button>
           )}
 
           {generating && (
             <div className="dream-loading" role="status" aria-live="polite">
               <div className="dream-spinner" aria-hidden="true" />
-              <p>Designing your robot&hellip; &#x2728;</p>
             </div>
           )}
         </>
@@ -386,11 +381,6 @@ function VoicePanel({ speech, generating, onToggle, onRetry, onConfirm }) {
 function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
   return (
     <section className="camera-panel" aria-label="Camera input">
-      <h3>Show me your idea!</h3>
-      <p className="panel-hint">
-        Tap <strong>Open Camera</strong>. Your browser will ask for permission &mdash; tap <strong>Allow</strong>.
-      </p>
-
       {camera.error && (
         <p className="warning" role="alert">
           {camera.error.message}
@@ -416,7 +406,7 @@ function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
             <video ref={camera.videoRef} autoPlay playsInline muted aria-label="Camera preview" />
           </div>
           <button className="snap-btn" onClick={onTake} aria-label="Take photo">
-            &#x1F4F8; Take Photo
+            &#x1F4F8;
           </button>
         </>
       )}
@@ -425,10 +415,21 @@ function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
         <div className="photo-preview">
           <img src={camera.photo} alt="Your creation" />
           <div className="confirm-row">
-            <button className="retry-btn" onClick={onRetake} disabled={generating} aria-label="Retake photo">
-              &#x1F504; Retake
+            <button
+              className="icon-btn"
+              onClick={onRetake}
+              disabled={generating}
+              aria-label="Retake photo"
+              title="Retake photo"
+            >
+              &#x1F504;
             </button>
-            <button className="confirm-btn" onClick={onConfirm} disabled={generating} aria-label="Use this photo">
+            <button
+              className="confirm-btn"
+              onClick={onConfirm}
+              disabled={generating}
+              aria-label="Use this photo"
+            >
               {generating ? 'Designing\u2026' : 'Confirm \u2713'}
             </button>
           </div>
@@ -436,7 +437,6 @@ function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
           {generating && (
             <div className="dream-loading" role="status" aria-live="polite">
               <div className="dream-spinner" aria-hidden="true" />
-              <p>Turning your photo into a robot&hellip; &#x2728;</p>
             </div>
           )}
         </div>
@@ -449,11 +449,6 @@ function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
 function PickOnePanel({ presets, selectedPreset, onPreset, onSwitchMode }) {
   return (
     <section className="pick-panel" aria-label="Pick a preset">
-      <h3>Pick a robot to build right away</h3>
-      <p className="panel-hint">
-        Choose one of these &mdash; no waiting for AI. Or switch to voice or camera for a unique build!
-      </p>
-
       <div className="template-grid" role="group" aria-label="Preset robots">
         {presets.map((model) => (
           <button
@@ -471,11 +466,10 @@ function PickOnePanel({ presets, selectedPreset, onPreset, onSwitchMode }) {
       </div>
 
       <div className="pick-switch-row">
-        <span className="pick-switch-label">Want a totally unique robot?</span>
-        <button className="pick-switch-btn" onClick={() => onSwitchMode('voice')}>
+        <button className="pick-switch-btn" onClick={() => onSwitchMode('voice')} aria-label="Switch to Talk to Me">
           &#x1F3A4; Talk to Me
         </button>
-        <button className="pick-switch-btn" onClick={() => onSwitchMode('camera')}>
+        <button className="pick-switch-btn" onClick={() => onSwitchMode('camera')} aria-label="Switch to Show Me">
           &#x1F4F8; Show Me
         </button>
       </div>
