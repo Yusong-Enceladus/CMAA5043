@@ -3,10 +3,11 @@
  * Supports 3 input modes: Voice (Web Speech API), Camera (with real image analysis), Template.
  * Includes text fallback, accessible controls, and sound feedback.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { robotModels } from '../data/models';
 import { analyzePhoto } from '../services/imageAnalyzer';
+import { generateCustomRobot, customizeModel } from '../services/aiService';
 import { playClick, playSuccess } from '../services/soundEffects';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useCamera from '../hooks/useCamera';
@@ -36,6 +37,9 @@ export default function ImagineScreen() {
   const [aiResponse, setAiResponse] = useState('');
   const [textInput, setTextInput] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [dreamInput, setDreamInput] = useState('');
+  const [dreaming, setDreaming] = useState(false);
+  const [dreamError, setDreamError] = useState(null);
 
   const speech = useSpeechRecognition();
   const camera = useCamera();
@@ -57,18 +61,27 @@ export default function ImagineScreen() {
     }
   };
 
+  // Track the last transcript we processed so we don't re-process the same text.
+  const processedTranscriptRef = useRef('');
+
+  // Auto-process when the user stops talking (recognition.onend → isListening=false).
+  useEffect(() => {
+    if (speech.isListening) return;
+    const text = speech.transcript.trim();
+    if (!text || text === processedTranscriptRef.current) return;
+    processedTranscriptRef.current = text;
+    setChildInput(text);
+    processInput(text);
+  }, [speech.isListening, speech.transcript]);
+
   const handleVoiceToggle = () => {
     if (soundEnabled) playClick();
     if (speech.isListening) {
       speech.stopListening();
-      setTimeout(() => {
-        if (speech.transcript) {
-          setChildInput(speech.transcript);
-          processInput(speech.transcript);
-        }
-      }, 500);
     } else {
+      processedTranscriptRef.current = '';
       speech.resetTranscript();
+      speech.clearError();
       speech.startListening();
     }
   };
@@ -114,6 +127,32 @@ export default function ImagineScreen() {
     setChildInput('');
     setAiResponse('');
     camera.startCamera();
+  };
+
+  const handleDream = async () => {
+    const text = dreamInput.trim();
+    if (!text || dreaming) return;
+    if (soundEnabled) playClick();
+    setDreamError(null);
+    setDreaming(true);
+    setChildInput(text);
+    try {
+      const blueprint = await generateCustomRobot(text);
+      const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
+      const custom = customizeModel(base, blueprint);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `I dreamed up a ${custom.name} ${custom.emoji} for you! ${custom.description} It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+    } catch (err) {
+      setDreamError(
+        "I couldn't dream that up right now. Try a simpler idea like 'a green robot frog' or pick a template below.",
+      );
+      if (import.meta.env.DEV) console.warn('[Dream]', err);
+    } finally {
+      setDreaming(false);
+    }
   };
 
   const handleTemplate = (model) => {
@@ -200,6 +239,16 @@ export default function ImagineScreen() {
             <h3>Pick One</h3>
             <p>Choose a robot to start!</p>
           </button>
+          <button
+            className={`input-card ${inputMode === 'dream' ? 'selected' : ''}`}
+            onClick={() => handleModeSelect('dream')}
+            aria-pressed={inputMode === 'dream'}
+            aria-label="Dream it up - describe any robot and AI designs it"
+          >
+            <div className="input-icon" aria-hidden="true">&#x2728;</div>
+            <h3>Dream It Up</h3>
+            <p>AI designs any robot you imagine!</p>
+          </button>
         </div>
 
         {/* Voice panel */}
@@ -207,6 +256,12 @@ export default function ImagineScreen() {
           <section className="voice-panel" aria-label="Voice input">
             <h3>Tell me about your robot!</h3>
             {!speech.isSupported && <p className="warning" role="alert">Voice not supported in this browser. Use the text box below!</p>}
+            {speech.error && (
+              <p className="warning" role="alert">
+                {speech.error}
+                {speech.permission === 'denied' && ' The text box below still works!'}
+              </p>
+            )}
             {speech.isSupported && (
               <>
                 {speech.isListening && (
@@ -250,10 +305,19 @@ export default function ImagineScreen() {
         {inputMode === 'camera' && (
           <section className="camera-panel" aria-label="Camera input">
             <h3>Show me your idea!</h3>
-            {camera.error && <p className="warning" role="alert">{camera.error}</p>}
+            {camera.error && (
+              <p className="warning" role="alert">
+                {camera.error.message}
+                {camera.error.code === 'denied' && ' No problem — pick a template below instead.'}
+              </p>
+            )}
             {!camera.isActive && !camera.photo && !analyzing && (
-              <button className="camera-start-btn" onClick={camera.startCamera} aria-label="Open camera">
-                &#x1F4F7; Open Camera
+              <button
+                className="camera-start-btn"
+                onClick={camera.startCamera}
+                aria-label={camera.error?.code === 'denied' ? 'Retry opening camera' : 'Open camera'}
+              >
+                {camera.error?.code === 'denied' ? '\u{1F504} Try Again' : '\u{1F4F7} Open Camera'}
               </button>
             )}
             {camera.isActive && (
@@ -280,6 +344,40 @@ export default function ImagineScreen() {
                     Retake &#x1F4F7;
                   </button>
                 </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Dream Up panel */}
+        {inputMode === 'dream' && (
+          <section className="dream-panel" aria-label="Dream up your own robot">
+            <h3>Describe ANY robot you can imagine!</h3>
+            <p className="dream-hint">Our AI will design a custom blueprint just for you.</p>
+            {dreamError && <p className="warning" role="alert">{dreamError}</p>}
+            <div className="dream-input-row">
+              <input
+                className="dream-input"
+                value={dreamInput}
+                onChange={(e) => setDreamInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleDream()}
+                placeholder='e.g. "a rainbow spider that dances"'
+                aria-label="Describe your custom robot"
+                disabled={dreaming}
+              />
+              <button
+                className="dream-submit-btn"
+                onClick={handleDream}
+                disabled={!dreamInput.trim() || dreaming}
+                aria-label="Generate robot"
+              >
+                {dreaming ? 'Dreaming…' : 'Dream!'}
+              </button>
+            </div>
+            {dreaming && (
+              <div className="dream-loading" role="status" aria-live="polite">
+                <div className="dream-spinner" aria-hidden="true" />
+                <p>Designing your robot… &#x2728;</p>
               </div>
             )}
           </section>

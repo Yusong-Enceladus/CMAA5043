@@ -10,9 +10,11 @@ const STORAGE_KEY = 'brickbuddy_session';
  */
 export function saveSession(state) {
   try {
+    const isCustom = state.selectedModel?.id?.startsWith('custom-');
     const data = {
       stage: state.stage,
       selectedModelId: state.selectedModel?.id || null,
+      customModel: isCustom ? state.selectedModel : null,
       currentStep: state.currentStep,
       chatHistory: state.chatHistory,
       steamProgress: state.steamProgress,
