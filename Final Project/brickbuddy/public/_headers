@@ -1,0 +1,22 @@
+# Cloudflare Pages edge headers — applied to every response.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Static assets: fingerprinted by Vite, safe to cache for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML shell: always revalidate so new deploys propagate.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# API proxy: never cache.
+/api/*
+  Cache-Control: no-store

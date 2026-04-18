@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
-import { getAIResponse, getStepWelcome } from '../services/chatEngine';
+import { getSmartAIResponse, getStepWelcome, hasAIKey } from '../services/chatEngine';
 import { playClick, playStepComplete, playChatReceive } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
 import './BuildScreen.css';
@@ -16,13 +16,14 @@ export default function BuildScreen() {
     chatHistory, addChat, progress, soundEnabled,
   } = useBuild();
   const [chatInput, setChatInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
   const prevStepRef = useRef(currentStep);
 
-  // Auto-scroll chat to bottom
+  // Auto-scroll chat to bottom (scoped to chat container, not page)
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory]);
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [chatHistory, isTyping]);
 
   // Send welcome message when step changes
   useEffect(() => {
@@ -53,17 +54,21 @@ export default function BuildScreen() {
   const step = selectedModel.steps[currentStep];
   const isLastStep = currentStep === selectedModel.steps.length - 1;
 
-  const handleSend = () => {
-    if (!chatInput.trim()) return;
-    addChat('child', chatInput);
+  const handleSend = async () => {
+    const text = chatInput.trim();
+    if (!text || isTyping) return;
+    addChat('child', text);
     if (soundEnabled) playClick();
+    setChatInput('');
+    setIsTyping(true);
 
-    const response = getAIResponse(chatInput, selectedModel, currentStep);
-    setTimeout(() => {
+    try {
+      const response = await getSmartAIResponse(text, selectedModel, currentStep, chatHistory);
       addChat('buddy', response.text, response.tag);
       if (soundEnabled) playChatReceive();
-    }, 600);
-    setChatInput('');
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleNext = () => {
@@ -112,6 +117,10 @@ export default function BuildScreen() {
 
           <div className="step-description" dangerouslySetInnerHTML={{ __html: step.desc }} />
 
+          <div className="pieces-heading">
+            <span aria-hidden="true">&#x1F9F1;</span>
+            <span>Pieces You Need</span>
+          </div>
           <div className="pieces-needed" role="list" aria-label="Pieces needed for this step">
             {step.pieces.map((p, i) => (
               <div key={i} className="piece" role="listitem">
@@ -133,7 +142,10 @@ export default function BuildScreen() {
 
         {/* Right: Chat */}
         <aside className="chat-sidebar" aria-label="Chat with BrickBuddy">
-          <div className="chat-header">&#x1F4AC; Ask BrickBuddy</div>
+          <div className="chat-header">
+            &#x1F4AC; Ask BrickBuddy
+            {hasAIKey() && <span className="ai-badge" title="Powered by live AI">AI</span>}
+          </div>
           <div className="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
             <div className="chat-msg from-buddy">
               <div className="chat-avatar" aria-hidden="true">&#x1F916;</div>
@@ -158,6 +170,12 @@ export default function BuildScreen() {
                 </div>
               </div>
             ))}
+            {isTyping && (
+              <div className="chat-msg from-buddy typing" aria-live="polite">
+                <div className="chat-avatar" aria-hidden="true">&#x1F916;</div>
+                <div className="chat-text typing-dots"><span></span><span></span><span></span></div>
+              </div>
+            )}
             <div ref={chatEndRef} />
           </div>
           <div className="chat-input-bar">
@@ -166,10 +184,11 @@ export default function BuildScreen() {
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Ask a question..."
+              placeholder={isTyping ? 'BrickBuddy is thinking...' : 'Ask a question...'}
+              disabled={isTyping}
               aria-label="Type a question for BrickBuddy"
             />
-            <button className="chat-send" onClick={handleSend} aria-label="Send message">&#x27A4;</button>
+            <button className="chat-send" onClick={handleSend} disabled={isTyping} aria-label="Send message">&#x27A4;</button>
           </div>
         </aside>
       </div>

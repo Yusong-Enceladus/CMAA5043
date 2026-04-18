@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+
+# Cloudflare Wrangler secrets for local dev
+.dev.vars
+.wrangler/
 
 # Editor directories and files
 .vscode/*
