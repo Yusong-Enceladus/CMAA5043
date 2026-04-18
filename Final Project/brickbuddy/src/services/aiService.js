@@ -117,7 +117,14 @@ export async function generateFullRobot(description) {
       temperature: 0.65,
     }),
   });
-  if (!res.ok) throw new Error(`generate failed: ${res.status}`);
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    const err = new Error(`generate failed: ${res.status}`);
+    err.status = res.status;
+    err.hint = errBody.hint;
+    err.serverError = errBody.error;
+    throw err;
+  }
   const data = await res.json();
   if (!data.text) throw new Error('empty response');
 

@@ -138,6 +138,7 @@ export default function ImagineScreen() {
     setChildInput(text);
 
     // Try true AI geometry first; if validation fails, fall back to recolored template.
+    let quotaHint = null;
     try {
       const custom = await generateFullRobot(text);
       selectModel(custom);
@@ -145,8 +146,10 @@ export default function ImagineScreen() {
       setAiResponse(
         `I dreamed up a ${custom.name} ${custom.emoji} — built just for your idea! ${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
       );
+      setDreaming(false);
       return;
     } catch (err) {
+      if (err.hint) quotaHint = err.hint;
       if (import.meta.env.DEV) console.info('[Dream] full-geometry failed, falling back:', err.message);
     }
 
@@ -160,8 +163,11 @@ export default function ImagineScreen() {
         `I dreamed up a ${custom.name} ${custom.emoji} for you! ${custom.description} It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
       );
     } catch (err) {
+      if (err.hint) quotaHint = err.hint;
       setDreamError(
-        "I couldn't dream that up right now. Try a simpler idea like 'a green robot frog' or pick a template below.",
+        quotaHint
+          ? `AI is resting: ${quotaHint} Pick a template below in the meantime!`
+          : "I couldn't dream that up right now. Try a simpler idea like 'a green robot frog' or pick a template below.",
       );
       if (import.meta.env.DEV) console.warn('[Dream] both paths failed:', err);
     } finally {

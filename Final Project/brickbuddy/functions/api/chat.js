@@ -23,7 +23,11 @@ const DEFAULT_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',   // predictable, no CoT leakage
   'openai/gpt-oss-120b:free',                 // strong refusals for kid safety
   'qwen/qwen3-next-80b-a3b-instruct:free',    // instruct-tuned variant (non-thinking)
-  'google/gemma-3-27b-it:free',               // gentle last-resort fallback
+  'google/gemma-3-27b-it:free',               // gentle fallback
+  'z-ai/glm-4.5-air:free',                    // last-resort anchor — weaker quality but
+                                              //   stays up when the frontier free models
+                                              //   are globally 429/503; better than a
+                                              //   "server unavailable" error for kids.
   // Nemotron 3 Super intentionally omitted — leaks plain-text reasoning.
 ];
 
@@ -35,7 +39,8 @@ const JSON_MODELS = [
   'google/gemma-4-31b-it:free',
   'openai/gpt-oss-120b:free',
   'google/gemma-3-27b-it:free',
-  'qwen/qwen3-next-80b-a3b-instruct:free',    // last resort; regex extracts JSON from prose
+  'qwen/qwen3-next-80b-a3b-instruct:free',    // regex extracts JSON from prose
+  'z-ai/glm-4.5-air:free',                    // last-resort availability anchor
 ];
 
 const MAX_MESSAGES = 12;
@@ -198,8 +203,19 @@ export async function onRequestPost({ request, env }) {
       }
     }
   }
+
+  // Detect the OpenRouter account-level daily free-tier quota ("free-models-per-day")
+  // vs. transient upstream throttling, and return a clearer message either way.
+  const detail = lastErr?.body || lastErr?.message || '';
+  const isDailyQuota = /free[-_]models[-_]per[-_]day/i.test(detail);
   return json(
-    { error: 'all models unavailable', detail: lastErr?.body || lastErr?.message || '' },
+    {
+      error: isDailyQuota ? 'daily free quota exhausted' : 'all models unavailable',
+      detail,
+      hint: isDailyQuota
+        ? 'OpenRouter caps uncredited accounts at 50 free requests/day across all models. It resets at 00:00 UTC, or you can add $10 of credit to lift the cap to 1000/day.'
+        : 'The free-tier models are all temporarily throttled. Please try again in a minute.',
+    },
     { status: 503 },
   );
 }
