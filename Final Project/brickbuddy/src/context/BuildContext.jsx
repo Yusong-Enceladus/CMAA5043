@@ -28,7 +28,10 @@ export function BuildProvider({ children }) {
 
     const saved = loadSession();
     if (saved && saved.stage !== 'splash') {
-      const model = robotModels.find(m => m.id === saved.selectedModelId);
+      // Custom models are stored inline; built-ins are looked up by id.
+      const model = saved.customModel
+        ? saved.customModel
+        : robotModels.find(m => m.id === saved.selectedModelId);
       if (model) {
         setSelectedModel(model);
         setCurrentStep(saved.currentStep || 0);
@@ -58,9 +61,13 @@ export function BuildProvider({ children }) {
     }
   }, [stage, buildStartTime]);
 
-  // Select a robot model — resets session for clean start
-  const selectModel = useCallback((modelId) => {
-    const model = robotModels.find(m => m.id === modelId);
+  // Select a robot model — accepts either a registered model id OR a full custom model object.
+  // Resets session for a clean start.
+  const selectModel = useCallback((modelOrId) => {
+    const model = typeof modelOrId === 'string'
+      ? robotModels.find(m => m.id === modelOrId)
+      : modelOrId;
+    if (!model) return;
     setSelectedModel(model);
     setCurrentStep(0);
     setChatHistory([]);

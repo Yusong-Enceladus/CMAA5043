@@ -11,16 +11,35 @@
  *   - Never forward OpenRouter auth headers to the client
  */
 
+/**
+ * Fallback chain — strictly ordered by intelligence among the OpenRouter
+ * free tier (verified April 2026). Order is tried top-down; first model
+ * that doesn't return 429/5xx wins. GLM-4.5-Air and Nemotron-Nano-9B
+ * deliberately removed; they benchmark well below the current crop.
+ */
 const DEFAULT_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b:free',   // Q1 2026 top open reasoning
+  'google/gemma-4-31b-it:free',               // Q1 2026 dense 31B — warm, family-safe default
+  'qwen/qwen3-next-80b-a3b-instruct:free',    // Arena ~1422 ELO tier, instruct-tuned (not thinking)
+  'openai/gpt-oss-120b:free',                 // frontier-ish MoE, strong refusals for kid safety
+  'meta-llama/llama-3.3-70b-instruct:free',   // stability anchor — huge ecosystem
+  'google/gemma-3-27b-it:free',               // safest last resort — gentle alignment for kids
+];
+
+// JSON-generation chain — Nemotron 3 Super leaks plain-text reasoning even
+// without <think> tags, so it's demoted. Llama 3.3 and Gemma 4 follow the
+// "respond only with JSON" instruction reliably.
+const JSON_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
-  'z-ai/glm-4.5-air:free',
-  'nvidia/nemotron-nano-9b-v2:free',
+  'google/gemma-4-31b-it:free',
+  'openai/gpt-oss-120b:free',
   'google/gemma-3-27b-it:free',
 ];
 
 const MAX_MESSAGES = 12;
 const MAX_TOTAL_CHARS = 8000;
-const MAX_TOKENS = 220;
+const MAX_TOKENS_CHAT = 220;
+const MAX_TOKENS_JSON = 450;       // extra budget for larger structured output
 const PER_ATTEMPT_TIMEOUT_MS = 10000;
 const RETRIABLE = new Set([429, 500, 502, 503, 504]);
 
@@ -49,7 +68,7 @@ function validate(body) {
   return null;
 }
 
-async function callModel(modelId, messages, apiKey, temperature, siteUrl) {
+async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTokens) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
   try {
@@ -65,7 +84,7 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl) {
         model: modelId,
         messages,
         temperature,
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
       }),
       signal: controller.signal,
     });
@@ -80,10 +99,25 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl) {
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content?.trim();
     if (!content) throw new Error('empty response');
-    return content;
+    return stripThinking(content);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Strip common chain-of-thought / scratchpad markers leaked by some models
+ * (Nemotron-thinking, Qwen-thinking, DeepSeek-R1 style).
+ */
+function stripThinking(text) {
+  let out = text;
+  // <think>...</think>, <reasoning>...</reasoning>, <|thinking|>...<|/thinking|>
+  out = out.replace(/<\s*(think|reasoning|analysis|scratchpad|thought)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
+  out = out.replace(/<\|thinking\|>[\s\S]*?<\|\/thinking\|>/gi, '');
+  out = out.replace(/<\|reasoning\|>[\s\S]*?<\|\/reasoning\|>/gi, '');
+  // Sometimes models dump "Thinking:" or "Reasoning:" sections before the answer.
+  out = out.replace(/^(?:Thinking|Reasoning|Analysis|Scratchpad|Thought)\s*:[\s\S]*?\n(?=[A-Z])/im, '');
+  return out.trim();
 }
 
 export async function onRequestPost({ request, env }) {
@@ -105,16 +139,20 @@ export async function onRequestPost({ request, env }) {
     ? Math.max(0, Math.min(1.5, body.temperature))
     : 0.8;
 
+  // mode="json" switches to the JSON-reliable chain and bumps max_tokens.
+  const jsonMode = body.mode === 'json';
+  const defaultChain = jsonMode ? JSON_MODELS : DEFAULT_MODELS;
   const models = Array.isArray(body.models) && body.models.length
-    ? body.models.slice(0, 4)
-    : DEFAULT_MODELS;
+    ? body.models.slice(0, 6)
+    : defaultChain;
+  const maxTokens = jsonMode ? MAX_TOKENS_JSON : MAX_TOKENS_CHAT;
 
   const siteUrl = new URL(request.url).origin;
 
   let lastErr;
   for (const modelId of models) {
     try {
-      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl);
+      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl, maxTokens);
       return json({ text: content, model: modelId });
     } catch (err) {
       lastErr = err;
