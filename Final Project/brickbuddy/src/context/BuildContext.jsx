@@ -76,6 +76,29 @@ export function BuildProvider({ children }) {
     setBuildDuration(0);
   }, []);
 
+  // Update selectedModel via an immutable updater. Accepts either the new
+  // model object or a function (currentModel) => newModel.
+  const updateSelectedModel = useCallback((updater) => {
+    setSelectedModel((current) => {
+      if (!current) return current;
+      return typeof updater === 'function' ? updater(current) : updater;
+    });
+  }, []);
+
+  // Convenience: mutate the parts array of a single step in the current model.
+  const updateStepParts = useCallback((stepIndex, partsUpdater) => {
+    setSelectedModel((current) => {
+      if (!current) return current;
+      const copy = structuredClone(current);
+      const step = copy.steps[stepIndex];
+      if (!step) return current;
+      step.newParts = typeof partsUpdater === 'function'
+        ? partsUpdater(step.newParts || [])
+        : partsUpdater;
+      return copy;
+    });
+  }, []);
+
   // Navigate build steps
   const nextStep = useCallback(() => {
     if (selectedModel && currentStep < selectedModel.steps.length - 1) {
@@ -149,6 +172,7 @@ export function BuildProvider({ children }) {
     <BuildContext.Provider value={{
       stage, setStage,
       selectedModel, selectModel, setSelectedModel,
+      updateSelectedModel, updateStepParts,
       currentStep, setCurrentStep, nextStep, prevStep,
       chatHistory, addChat,
       steamProgress, setSteamProgress,
