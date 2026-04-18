@@ -46,8 +46,10 @@ const JSON_MODELS = [
 const MAX_MESSAGES = 12;
 const MAX_TOTAL_CHARS = 8000;
 const MAX_TOKENS_CHAT = 220;
-const MAX_TOKENS_JSON = 450;       // extra budget for larger structured output
-const PER_ATTEMPT_TIMEOUT_MS = 10000;
+const MAX_TOKENS_JSON = 450;              // extra budget for larger structured output
+const PER_ATTEMPT_TIMEOUT_MS_CHAT = 10000; // short — falls through fast if throttled
+const PER_ATTEMPT_TIMEOUT_MS_JSON = 22000; // longer — JSON payloads take longer to generate
+                                           //   and free models are slow under load
 const RETRIABLE = new Set([429, 500, 502, 503, 504]);
 
 const json = (body, init = {}) =>
@@ -75,9 +77,9 @@ function validate(body) {
   return null;
 }
 
-async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTokens) {
+async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTokens, timeoutMs) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -188,13 +190,14 @@ export async function onRequestPost({ request, env }) {
     ? body.models.slice(0, 6)
     : defaultChain;
   const maxTokens = jsonMode ? MAX_TOKENS_JSON : MAX_TOKENS_CHAT;
+  const perAttemptMs = jsonMode ? PER_ATTEMPT_TIMEOUT_MS_JSON : PER_ATTEMPT_TIMEOUT_MS_CHAT;
 
   const siteUrl = new URL(request.url).origin;
 
   let lastErr;
   for (const modelId of models) {
     try {
-      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl, maxTokens);
+      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl, maxTokens, perAttemptMs);
       return json({ text: content, model: modelId });
     } catch (err) {
       lastErr = err;

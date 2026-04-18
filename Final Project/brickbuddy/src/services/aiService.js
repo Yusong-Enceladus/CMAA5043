@@ -7,7 +7,7 @@
  */
 
 const API_URL = '/api/chat';
-const REQUEST_TIMEOUT_MS = 45000; // server already per-model-caps at 10s × up to 4 models
+const REQUEST_TIMEOUT_MS = 150000; // server may retry up to 6 models × 22s for JSON mode
 
 // Kept for UI badge; now always true since the proxy is part of the deployment.
 // In local Vite dev without wrangler, the fetch will 404 → we fall back to rules.
