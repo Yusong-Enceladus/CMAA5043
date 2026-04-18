@@ -112,7 +112,15 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTok
     }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content?.trim();
-    if (!content) throw new Error('empty response');
+    if (!content) {
+      // Some models occasionally return empty content (content filter,
+      // reasoning-only output, etc.). Treat as retriable so the chain
+      // falls through to the next model rather than aborting.
+      const err = new Error('empty response');
+      err.retriable = true;
+      err.status = 204;
+      throw err;
+    }
     return stripThinking(content);
   } finally {
     clearTimeout(timer);
