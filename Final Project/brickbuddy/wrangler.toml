@@ -1,7 +1,12 @@
 name = "brickbuddy"
+main = "worker.js"
 compatibility_date = "2024-09-23"
-pages_build_output_dir = "./dist"
 
-# Runtime env vars come from the Cloudflare dashboard (Pages → Settings →
-# Environment variables). For local dev put them in `.dev.vars` — see
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Runtime env vars come from the Cloudflare dashboard (Worker → Settings →
+# Variables and Secrets). For local dev put them in `.dev.vars` — see
 # `.dev.vars.example` for the template. Never commit real secrets here.
