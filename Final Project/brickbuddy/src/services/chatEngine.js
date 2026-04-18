@@ -4,6 +4,7 @@
  * Uses intent classification + retrieval from the knowledge base rather than raw keyword matching.
  */
 import { steamFacts } from '../data/models';
+import { getAIResponseOnline, hasAIKey } from './aiService';
 
 /* ── Intent Classification ───────────────────────────────────── */
 
@@ -201,17 +202,31 @@ function generateResponse(intent, ctx) {
 /* ── Public API ──────────────────────────────────────────────── */
 
 /**
- * Generate a context-aware AI response.
- * @param {string} text - User's message
- * @param {object} model - Selected robot model
- * @param {number} stepIndex - Current build step index
- * @returns {{ text: string, tag: string|null }}
+ * Generate a context-aware AI response using the rule-based engine.
+ * Synchronous, always succeeds — used as fallback.
  */
 export function getAIResponse(text, model, stepIndex) {
   const intent = classifyIntent(text);
   const ctx = getStepContext(model, stepIndex);
   return generateResponse(intent, ctx);
 }
+
+/**
+ * Smart AI response: tries the online LLM first, falls back to rules on error.
+ * Returns a Promise<{ text, tag, source }> where source is 'ai' or 'rules'.
+ */
+export async function getSmartAIResponse(text, model, stepIndex, history = []) {
+  if (hasAIKey()) {
+    try {
+      return await getAIResponseOnline(text, model, stepIndex, history);
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn('[BrickBuddy] AI fallback →', err.message);
+    }
+  }
+  return { ...getAIResponse(text, model, stepIndex), source: 'rules' };
+}
+
+export { hasAIKey };
 
 /**
  * Generate a welcome message when entering a new step.
