@@ -1,9 +1,15 @@
 /**
- * ImagineScreen — Stage 1: Children describe their robot idea.
- * Supports 3 input modes: Voice (Web Speech API), Camera (with real image analysis), Template.
- * Includes text fallback, accessible controls, and sound feedback.
+ * ImagineScreen — The home hub. Three entry points:
+ *   1. Talk to Me  — voice → transcript → Retry/Confirm → AI generates a custom robot.
+ *   2. Show Me     — camera → photo → Retry/Confirm → AI generates a custom robot from the photo.
+ *   3. Pick One    — 3 ready-made presets (no AI). From this mode you can still hop over
+ *                    to Talk/Show to generate a custom build.
+ *
+ * Talk/Show are "Turing-complete" paths: whatever the child says or shows, the AI designs
+ * a brand-new robot around it. Pick One is the instant-start path that uses hand-authored
+ * presets with detailed, anatomically-faithful 3D geometry.
  */
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { robotModels } from '../data/models';
 import { analyzePhoto } from '../services/imageAnalyzer';
@@ -13,189 +19,165 @@ import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useCamera from '../hooks/useCamera';
 import './ImagineScreen.css';
 
-// Keywords -> model mapping with confidence scoring
-const MODEL_KEYWORDS = {
-  dog: ['dog', 'puppy', 'walk', 'woof', 'bark', 'pet', 'four legs', 'tail wag', 'fetch', 'paw', 'bone', 'furry'],
-  car: ['car', 'race', 'fast', 'drive', 'speed', 'wheel', 'vroom', 'truck', 'vehicle', 'motor', 'road', 'zoom'],
-  dino: ['dino', 'dinosaur', 'rex', 'roar', 'jurassic', 'stomp', 'trex', 'raptor', 'teeth', 'prehistoric', 'giant'],
-};
-
-function classifyInput(text) {
-  const lower = text.toLowerCase();
-  const scores = {};
-  for (const [modelId, keywords] of Object.entries(MODEL_KEYWORDS)) {
-    scores[modelId] = keywords.filter(kw => lower.includes(kw)).length;
-  }
-  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
-  return { modelId: best[1] > 0 ? best[0] : null, confidence: best[1] };
-}
-
 export default function ImagineScreen() {
   const { selectModel, setStage, progress, soundEnabled } = useBuild();
-  const [inputMode, setInputMode] = useState(null);
-  const [childInput, setChildInput] = useState('');
+  const [mode, setMode] = useState(null); // null | 'voice' | 'camera' | 'pick'
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState(null);
   const [aiResponse, setAiResponse] = useState('');
-  const [textInput, setTextInput] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [dreamInput, setDreamInput] = useState('');
-  const [dreaming, setDreaming] = useState(false);
-  const [dreamError, setDreamError] = useState(null);
+  const [selectedPreset, setSelectedPreset] = useState(null);
 
   const speech = useSpeechRecognition();
   const camera = useCamera();
 
-  const processInput = (input) => {
-    const { modelId, confidence } = classifyInput(input);
-    if (modelId && confidence > 0) {
-      const model = robotModels.find(m => m.id === modelId);
-      selectModel(modelId);
-      if (soundEnabled) playSuccess();
-      setAiResponse(`I think you want to build a ${model.name} ${model.emoji}! It uses ${model.pieceCount} pieces and has ${model.steps.length} steps. Let's do it!`);
-    } else {
-      selectModel('dog');
-      setAiResponse(
-        'Hmm, that sounds creative! I\'m not sure which robot matches best. ' +
-        'Let me suggest the Robot Dog \u{1F436} to start \u2014 it\'s beginner-friendly! ' +
-        'Or you can go back and pick a different one from the templates.'
-      );
-    }
-  };
-
-  // Track the last transcript we processed so we don't re-process the same text.
-  const processedTranscriptRef = useRef('');
-
-  // Auto-process when the user stops talking (recognition.onend → isListening=false).
+  // Bind the stream to the <video> element when it mounts in the DOM.
   useEffect(() => {
-    if (speech.isListening) return;
-    const text = speech.transcript.trim();
-    if (!text || text === processedTranscriptRef.current) return;
-    processedTranscriptRef.current = text;
-    setChildInput(text);
-    processInput(text);
-  }, [speech.isListening, speech.transcript]);
+    if (camera.isActive) camera.attachVideoToStream();
+  }, [camera.isActive, camera.attachVideoToStream]);
 
-  const handleVoiceToggle = () => {
+  /* ───────── Mode switching ───────── */
+  const handleModeSelect = (next) => {
     if (soundEnabled) playClick();
-    if (speech.isListening) {
-      speech.stopListening();
-    } else {
-      processedTranscriptRef.current = '';
-      speech.resetTranscript();
-      speech.clearError();
-      speech.startListening();
-    }
-  };
-
-  const handleTextSubmit = () => {
-    if (!textInput.trim()) return;
-    if (soundEnabled) playClick();
-    setChildInput(textInput.trim());
-    processInput(textInput.trim());
-    setTextInput('');
-  };
-
-  // Real camera photo analysis using canvas color/shape detection
-  const handlePhoto = async () => {
-    const dataUrl = camera.takePhoto();
-    if (!dataUrl) return;
-    setAnalyzing(true);
-    setChildInput('(Showed a photo of their LEGO idea)');
-
-    const result = await analyzePhoto(dataUrl);
-    const model = robotModels.find(m => m.id === result.modelId);
-
-    setAnalyzing(false);
-    selectModel(result.modelId);
-    if (soundEnabled) playSuccess();
-
-    if (result.confidence > 0.45) {
-      setAiResponse(
-        `${result.reason}! I think you'd love building a ${model.name} ${model.emoji}! ` +
-        `It has ${model.pieceCount} pieces and ${model.steps.length} fun steps. Let's go!`
-      );
-    } else {
-      setAiResponse(
-        `Interesting photo! ${result.reason}. ` +
-        `I'll suggest a ${model.name} ${model.emoji} \u2014 it uses ${model.pieceCount} pieces ` +
-        `and is really fun to build! You can also pick a different robot from the templates.`
-      );
-    }
-  };
-
-  const handleRetake = () => {
+    camera.stopCamera();
     camera.setPhoto(null);
-    setChildInput('');
+    speech.stopListening();
+    speech.resetTranscript();
+    speech.clearError();
+    camera.clearError();
     setAiResponse('');
-    camera.startCamera();
-  };
-
-  const handleDream = async () => {
-    const text = dreamInput.trim();
-    if (!text || dreaming) return;
-    if (soundEnabled) playClick();
-    setDreamError(null);
-    setDreaming(true);
-    setChildInput(text);
-
-    // Try true AI geometry first; if validation fails, fall back to recolored template.
-    let quotaHint = null;
-    try {
-      const custom = await generateFullRobot(text);
-      selectModel(custom);
-      if (soundEnabled) playSuccess();
-      setAiResponse(
-        `I dreamed up a ${custom.name} ${custom.emoji} — built just for your idea! ${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
-      );
-      setDreaming(false);
-      return;
-    } catch (err) {
-      if (err.hint) quotaHint = err.hint;
-      if (import.meta.env.DEV) console.info('[Dream] full-geometry failed, falling back:', err.message);
-    }
-
-    try {
-      const blueprint = await generateCustomRobot(text);
-      const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
-      const custom = customizeModel(base, blueprint);
-      selectModel(custom);
-      if (soundEnabled) playSuccess();
-      setAiResponse(
-        `I dreamed up a ${custom.name} ${custom.emoji} for you! ${custom.description} It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
-      );
-    } catch (err) {
-      if (err.hint) quotaHint = err.hint;
-      setDreamError(
-        quotaHint
-          ? `AI is resting: ${quotaHint} Pick a template below in the meantime!`
-          : "I couldn't dream that up right now. Try a simpler idea like 'a green robot frog' or pick a template below.",
-      );
-      if (import.meta.env.DEV) console.warn('[Dream] both paths failed:', err);
-    } finally {
-      setDreaming(false);
-    }
-  };
-
-  const handleTemplate = (model) => {
-    if (soundEnabled) playClick();
-    setChildInput(`I want to build a ${model.name}!`);
-    selectModel(model.id);
-    if (soundEnabled) playSuccess();
-    setAiResponse(
-      `Amazing choice! A ${model.name} ${model.emoji} \u2014 I love it! ` +
-      `It uses ${model.pieceCount} pieces across ${model.steps.length} steps. ` +
-      `${model.description} Ready to start building?`
-    );
-  };
-
-  const handleModeSelect = (mode) => {
-    if (soundEnabled) playClick();
-    setInputMode(mode);
+    setGenError(null);
+    setSelectedPreset(null);
+    setMode(next);
   };
 
   const handleBack = () => {
     camera.stopCamera();
     speech.stopListening();
     setStage('splash');
+  };
+
+  /* ───────── Voice flow ───────── */
+  const handleVoiceToggle = () => {
+    if (soundEnabled) playClick();
+    if (speech.isListening) {
+      speech.stopListening();
+    } else {
+      speech.resetTranscript();
+      speech.clearError();
+      setAiResponse('');
+      setGenError(null);
+      speech.startListening();
+    }
+  };
+
+  const handleVoiceRetry = () => {
+    if (soundEnabled) playClick();
+    speech.resetTranscript();
+    speech.clearError();
+    setAiResponse('');
+    setGenError(null);
+    speech.startListening();
+  };
+
+  const handleVoiceConfirm = async () => {
+    if (soundEnabled) playClick();
+    speech.stopListening();
+    await generateFromText(speech.transcript.trim());
+  };
+
+  /* ───────── Camera flow ───────── */
+  const handleTakePhoto = () => {
+    const dataUrl = camera.takePhoto();
+    if (!dataUrl) return;
+    if (soundEnabled) playClick();
+  };
+
+  const handleRetake = () => {
+    if (soundEnabled) playClick();
+    camera.setPhoto(null);
+    setAiResponse('');
+    setGenError(null);
+    camera.startCamera();
+  };
+
+  const handlePhotoConfirm = async () => {
+    if (!camera.photo) return;
+    if (soundEnabled) playClick();
+    setGenerating(true);
+    setGenError(null);
+    setAiResponse('Looking at your photo\u2026 \u{1F50D}');
+    try {
+      const analysis = await analyzePhoto(camera.photo);
+      const description = `A robot inspired by this picture. Detected: ${analysis.reason}.`;
+      await generateFromText(description, analysis);
+    } catch {
+      setGenError("I couldn't look at that photo. Try taking another one, or pick a preset!");
+      setGenerating(false);
+    }
+  };
+
+  /* ───────── Shared AI-generation path ───────── */
+  const generateFromText = async (text, photoAnalysis = null) => {
+    if (!text) {
+      setGenError("I didn't catch that. Try again!");
+      return;
+    }
+    setGenerating(true);
+    setGenError(null);
+    setAiResponse('Designing your robot\u2026');
+
+    const prompt = photoAnalysis
+      ? `${text} (Hint: looks closest to a ${photoAnalysis.modelId}.)`
+      : text;
+
+    let quotaHint = null;
+
+    try {
+      const custom = await generateFullRobot(prompt);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `I made a ${custom.name} ${custom.emoji} just for you! ` +
+        `${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+      setGenerating(false);
+      return;
+    } catch (err) {
+      if (err.hint) quotaHint = err.hint;
+    }
+
+    try {
+      const blueprint = await generateCustomRobot(prompt);
+      const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
+      const custom = customizeModel(base, blueprint);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `Here's a ${custom.name} ${custom.emoji} inspired by your idea! ${custom.description} ` +
+        `It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+    } catch (err) {
+      if (err.hint) quotaHint = err.hint;
+      setGenError(
+        quotaHint
+          ? `AI is taking a break: ${quotaHint} Tap "Pick One" for an instant build!`
+          : "I couldn't dream that up right now. Try again, or use Pick One!",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /* ───────── Pick One flow ───────── */
+  const handlePreset = (model) => {
+    if (soundEnabled) playClick();
+    setSelectedPreset(model.id);
+    selectModel(model.id);
+    if (soundEnabled) playSuccess();
+    setAiResponse(
+      `A ${model.name} ${model.emoji} — great choice! ${model.description} ` +
+      `${model.pieceCount} pieces across ${model.steps.length} steps. Ready to build?`,
+    );
   };
 
   const handleStartBuild = () => {
@@ -205,14 +187,21 @@ export default function ImagineScreen() {
     setStage('build');
   };
 
+  /* ───────── Rendering ───────── */
+  const showStartBtn = aiResponse && !generating && !genError && (
+    (mode === 'pick' && selectedPreset) ||
+    (mode === 'voice' && !speech.isListening) ||
+    (mode === 'camera' && camera.photo)
+  );
+
   return (
-    <div className="imagine-screen" role="main" aria-label="Imagine your robot">
+    <div className="imagine-screen" role="main" aria-label="Choose how to start">
       <header className="imagine-header">
         <button className="back-btn" onClick={handleBack} aria-label="Go back to home">
           <span aria-hidden="true">&larr;</span>
         </button>
         <span className="logo-small" aria-hidden="true">Brick<span>Buddy</span></span>
-        <div className="progress-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progress: ${progress}%`}>
+        <div className="progress-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
           <div className="progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <span className="stage-label">Stage 1: Imagine</span>
@@ -222,221 +211,274 @@ export default function ImagineScreen() {
         <div className="buddy-chat" role="status" aria-live="polite">
           <div className="buddy-avatar" aria-hidden="true">&#x1F916;</div>
           <div className="buddy-bubble">
-            Hi there, little builder! &#x1F44B;<br />
-            What kind of robot do you want to build today?
-            You can <strong>tell me</strong>, <strong>show me</strong>, or <strong>pick one below</strong>!
+            Hi there! &#x1F44B; What robot do you want to build today?<br />
+            Pick <strong>Talk to Me</strong>, <strong>Show Me</strong>, or <strong>Pick One</strong>.
           </div>
         </div>
 
-        <div className="input-cards" role="group" aria-label="Choose how to describe your robot">
+        <div className="input-cards" role="group" aria-label="Choose a mode">
           <button
-            className={`input-card ${inputMode === 'voice' ? 'selected' : ''}`}
+            className={`input-card ${mode === 'voice' ? 'selected' : ''}`}
             onClick={() => handleModeSelect('voice')}
-            aria-pressed={inputMode === 'voice'}
-            aria-label="Talk to me - describe your dream robot"
+            aria-pressed={mode === 'voice'}
           >
             <div className="input-icon" aria-hidden="true">&#x1F3A4;</div>
             <h3>Talk to Me</h3>
-            <p>Describe your dream robot!</p>
+            <p>Tell me ANY robot &mdash; AI builds it!</p>
           </button>
           <button
-            className={`input-card ${inputMode === 'camera' ? 'selected' : ''}`}
+            className={`input-card ${mode === 'camera' ? 'selected' : ''}`}
             onClick={() => handleModeSelect('camera')}
-            aria-pressed={inputMode === 'camera'}
-            aria-label="Show me - take a photo of your idea"
+            aria-pressed={mode === 'camera'}
           >
             <div className="input-icon" aria-hidden="true">&#x1F4F8;</div>
             <h3>Show Me</h3>
-            <p>Take a photo of your idea!</p>
+            <p>Snap a photo &mdash; AI builds from it!</p>
           </button>
           <button
-            className={`input-card ${inputMode === 'template' ? 'selected' : ''}`}
-            onClick={() => handleModeSelect('template')}
-            aria-pressed={inputMode === 'template'}
-            aria-label="Pick one - choose a robot to start"
+            className={`input-card ${mode === 'pick' ? 'selected' : ''}`}
+            onClick={() => handleModeSelect('pick')}
+            aria-pressed={mode === 'pick'}
           >
             <div className="input-icon" aria-hidden="true">&#x1F9E9;</div>
             <h3>Pick One</h3>
-            <p>Choose a robot to start!</p>
-          </button>
-          <button
-            className={`input-card ${inputMode === 'dream' ? 'selected' : ''}`}
-            onClick={() => handleModeSelect('dream')}
-            aria-pressed={inputMode === 'dream'}
-            aria-label="Dream it up - describe any robot and AI designs it"
-          >
-            <div className="input-icon" aria-hidden="true">&#x2728;</div>
-            <h3>Dream It Up</h3>
-            <p>AI designs any robot you imagine!</p>
+            <p>Choose from 3 ready-to-build robots!</p>
           </button>
         </div>
 
-        {/* Voice panel */}
-        {inputMode === 'voice' && (
-          <section className="voice-panel" aria-label="Voice input">
-            <h3>Tell me about your robot!</h3>
-            {!speech.isSupported && <p className="warning" role="alert">Voice not supported in this browser. Use the text box below!</p>}
-            {speech.error && (
-              <p className="warning" role="alert">
-                {speech.error}
-                {speech.permission === 'denied' && ' The text box below still works!'}
-              </p>
-            )}
-            {speech.isSupported && (
-              <>
-                {speech.isListening && (
-                  <div className="voice-wave" aria-hidden="true">
-                    {[...Array(7)].map((_, i) => <div key={i} className="bar" style={{ animationDelay: `${i * 0.1}s` }} />)}
-                  </div>
-                )}
-                <button
-                  className={`mic-btn ${speech.isListening ? 'recording' : ''}`}
-                  onClick={handleVoiceToggle}
-                  aria-label={speech.isListening ? 'Stop recording' : 'Start recording'}
-                >
-                  {speech.isListening ? '\u23F9' : '\u{1F3A4}'}
-                </button>
-                {speech.transcript && <p className="transcript" aria-live="polite">"{speech.transcript}"</p>}
-                <p className="voice-status">
-                  {speech.isListening ? 'Listening... tell me about your robot!' : 'Press the button and start talking'}
-                </p>
-              </>
-            )}
-            <div className="text-fallback">
-              <p className="fallback-label">Or type your idea here:</p>
-              <div className="text-input-row">
-                <input
-                  className="text-input"
-                  value={textInput}
-                  onChange={e => setTextInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleTextSubmit()}
-                  placeholder='e.g. "I want a robot dog that walks!"'
-                  aria-label="Type your robot idea"
-                />
-                <button className="text-submit-btn" onClick={handleTextSubmit} disabled={!textInput.trim()} aria-label="Submit your idea">
-                  Go!
-                </button>
-              </div>
-            </div>
-          </section>
+        {mode === 'voice' && (
+          <VoicePanel
+            speech={speech}
+            generating={generating}
+            onToggle={handleVoiceToggle}
+            onRetry={handleVoiceRetry}
+            onConfirm={handleVoiceConfirm}
+          />
         )}
 
-        {/* Camera panel */}
-        {inputMode === 'camera' && (
-          <section className="camera-panel" aria-label="Camera input">
-            <h3>Show me your idea!</h3>
-            {camera.error && (
-              <p className="warning" role="alert">
-                {camera.error.message}
-                {camera.error.code === 'denied' && ' No problem — pick a template below instead.'}
-              </p>
-            )}
-            {!camera.isActive && !camera.photo && !analyzing && (
-              <button
-                className="camera-start-btn"
-                onClick={camera.startCamera}
-                aria-label={camera.error?.code === 'denied' ? 'Retry opening camera' : 'Open camera'}
-              >
-                {camera.error?.code === 'denied' ? '\u{1F504} Try Again' : '\u{1F4F7} Open Camera'}
-              </button>
-            )}
-            {camera.isActive && (
-              <>
-                <div className="camera-preview">
-                  <video ref={camera.videoRef} autoPlay playsInline muted aria-label="Camera preview" />
-                </div>
-                <button className="snap-btn" onClick={handlePhoto} aria-label="Take photo">
-                  &#x1F4F8; Take Photo
-                </button>
-              </>
-            )}
-            {analyzing && (
-              <div className="analyzing-state" role="status" aria-live="polite">
-                <div className="analyzing-spinner" aria-hidden="true" />
-                <p>Analyzing your photo... &#x1F50D;</p>
-              </div>
-            )}
-            {camera.photo && !analyzing && (
-              <div className="photo-preview">
-                <img src={camera.photo} alt="Your creation" />
-                <div className="photo-actions">
-                  <button className="retake-btn" onClick={handleRetake} aria-label="Retake photo">
-                    Retake &#x1F4F7;
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
+        {mode === 'camera' && (
+          <CameraPanel
+            camera={camera}
+            generating={generating}
+            onTake={handleTakePhoto}
+            onRetake={handleRetake}
+            onConfirm={handlePhotoConfirm}
+          />
         )}
 
-        {/* Dream Up panel */}
-        {inputMode === 'dream' && (
-          <section className="dream-panel" aria-label="Dream up your own robot">
-            <h3>Describe ANY robot you can imagine!</h3>
-            <p className="dream-hint">Our AI will design a custom blueprint just for you.</p>
-            {dreamError && <p className="warning" role="alert">{dreamError}</p>}
-            <div className="dream-input-row">
-              <input
-                className="dream-input"
-                value={dreamInput}
-                onChange={(e) => setDreamInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleDream()}
-                placeholder='e.g. "a rainbow spider that dances"'
-                aria-label="Describe your custom robot"
-                disabled={dreaming}
-              />
-              <button
-                className="dream-submit-btn"
-                onClick={handleDream}
-                disabled={!dreamInput.trim() || dreaming}
-                aria-label="Generate robot"
-              >
-                {dreaming ? 'Dreaming…' : 'Dream!'}
-              </button>
-            </div>
-            {dreaming && (
-              <div className="dream-loading" role="status" aria-live="polite">
-                <div className="dream-spinner" aria-hidden="true" />
-                <p>Designing your robot… &#x2728;</p>
-              </div>
-            )}
-          </section>
+        {mode === 'pick' && (
+          <PickOnePanel
+            presets={robotModels}
+            selectedPreset={selectedPreset}
+            onPreset={handlePreset}
+            onSwitchMode={handleModeSelect}
+          />
         )}
 
-        {/* Template grid */}
-        {inputMode === 'template' && (
-          <section className="template-grid" role="group" aria-label="Robot templates">
-            {robotModels.map(model => (
-              <button key={model.id} className="template-card" onClick={() => handleTemplate(model)} aria-label={`${model.name} - ${model.difficulty} - ${model.pieceCount} pieces`}>
-                <div className="template-emoji" aria-hidden="true">{model.emoji}</div>
-                <div className="template-name">{model.name}</div>
-                <div className="template-diff">{model.difficulty} &middot; {model.pieceCount} pieces</div>
-              </button>
-            ))}
-          </section>
-        )}
+        {genError && <p className="warning" role="alert">{genError}</p>}
 
-        {/* Child's input display */}
-        {childInput && (
-          <div className="child-chat">
-            <div className="child-bubble">{childInput}</div>
-            <div className="child-avatar" aria-hidden="true">&#x1F466;</div>
+        {aiResponse && (
+          <div className="buddy-chat" role="status" aria-live="polite">
+            <div className="buddy-avatar" aria-hidden="true">&#x1F916;</div>
+            <div className="buddy-bubble">{aiResponse}</div>
           </div>
         )}
 
-        {/* AI response */}
-        {aiResponse && (
-          <>
-            <div className="buddy-chat" role="status" aria-live="polite">
-              <div className="buddy-avatar" aria-hidden="true">&#x1F916;</div>
-              <div className="buddy-bubble">{aiResponse}</div>
-            </div>
-            <button className="start-build-btn" onClick={handleStartBuild} aria-label="Start building your robot">
-              Start Building! &#x1F528;
-            </button>
-          </>
+        {showStartBtn && (
+          <button className="start-build-btn" onClick={handleStartBuild}>
+            Start Building! &#x1F528;
+          </button>
         )}
       </div>
     </div>
+  );
+}
+
+/* ─────────────────────── Voice Panel ─────────────────────── */
+function VoicePanel({ speech, generating, onToggle, onRetry, onConfirm }) {
+  const hasTranscript = speech.transcript.trim().length > 0;
+  const canConfirm = hasTranscript && !speech.isListening && !generating;
+  const canRetry = (hasTranscript || speech.error) && !speech.isListening && !generating;
+
+  return (
+    <section className="voice-panel" aria-label="Voice input">
+      <h3>Tell me about your dream robot!</h3>
+      <p className="panel-hint">
+        Use <strong>this mic button</strong> (not your system voice bar).<br />
+        Tap it, speak your idea, then press <strong>Confirm</strong>.
+      </p>
+
+      {!speech.isSupported && (
+        <p className="warning" role="alert">
+          Voice isn&apos;t supported in this browser. Try Chrome, Edge, or Safari &mdash; or use <strong>Show Me</strong> / <strong>Pick One</strong>.
+        </p>
+      )}
+
+      {speech.error && <p className="warning" role="alert">{speech.error}</p>}
+
+      {speech.isSupported && (
+        <>
+          {speech.isListening && (
+            <div className="voice-wave" aria-hidden="true">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className="bar" style={{ animationDelay: `${i * 0.1}s` }} />
+              ))}
+            </div>
+          )}
+
+          <button
+            className={`mic-btn ${speech.isListening ? 'recording' : ''}`}
+            onClick={onToggle}
+            disabled={generating}
+            aria-label={speech.isListening ? 'Stop recording' : 'Start recording'}
+          >
+            {speech.isListening ? '\u23F9' : '\u{1F3A4}'}
+          </button>
+
+          <p className="voice-status">
+            {speech.isListening
+              ? 'Listening\u2026 tell me about your robot!'
+              : hasTranscript
+                ? 'Here is what I heard:'
+                : 'Tap the microphone and start talking.'}
+          </p>
+
+          {hasTranscript && (
+            <div className="transcript-box" aria-live="polite">
+              &ldquo;{speech.transcript}&rdquo;
+            </div>
+          )}
+
+          {(canRetry || canConfirm) && (
+            <div className="confirm-row">
+              <button
+                className="retry-btn"
+                onClick={onRetry}
+                disabled={!canRetry}
+                aria-label="Record again"
+              >
+                &#x1F504; Retry
+              </button>
+              <button
+                className="confirm-btn"
+                onClick={onConfirm}
+                disabled={!canConfirm}
+                aria-label="Use this and build"
+              >
+                {generating ? 'Designing\u2026' : 'Confirm \u2713'}
+              </button>
+            </div>
+          )}
+
+          {generating && (
+            <div className="dream-loading" role="status" aria-live="polite">
+              <div className="dream-spinner" aria-hidden="true" />
+              <p>Designing your robot&hellip; &#x2728;</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ─────────────────────── Camera Panel ─────────────────────── */
+function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
+  return (
+    <section className="camera-panel" aria-label="Camera input">
+      <h3>Show me your idea!</h3>
+      <p className="panel-hint">
+        Tap <strong>Open Camera</strong>. Your browser will ask for permission &mdash; tap <strong>Allow</strong>.
+      </p>
+
+      {camera.error && (
+        <p className="warning" role="alert">
+          {camera.error.message}
+          {camera.error.code === 'denied' && ' Try "Pick One" if you prefer not to share your camera.'}
+        </p>
+      )}
+
+      {!camera.isActive && !camera.photo && !camera.isStarting && (
+        <button
+          className="camera-start-btn"
+          onClick={camera.startCamera}
+          aria-label={camera.error?.code === 'denied' ? 'Retry opening camera' : 'Open camera'}
+        >
+          {camera.error?.code === 'denied' ? '\u{1F504} Try Again' : '\u{1F4F7} Open Camera'}
+        </button>
+      )}
+
+      {camera.isStarting && <p className="voice-status">Asking your browser for camera permission&hellip;</p>}
+
+      {camera.isActive && (
+        <>
+          <div className="camera-preview">
+            <video ref={camera.videoRef} autoPlay playsInline muted aria-label="Camera preview" />
+          </div>
+          <button className="snap-btn" onClick={onTake} aria-label="Take photo">
+            &#x1F4F8; Take Photo
+          </button>
+        </>
+      )}
+
+      {camera.photo && (
+        <div className="photo-preview">
+          <img src={camera.photo} alt="Your creation" />
+          <div className="confirm-row">
+            <button className="retry-btn" onClick={onRetake} disabled={generating} aria-label="Retake photo">
+              &#x1F504; Retake
+            </button>
+            <button className="confirm-btn" onClick={onConfirm} disabled={generating} aria-label="Use this photo">
+              {generating ? 'Designing\u2026' : 'Confirm \u2713'}
+            </button>
+          </div>
+
+          {generating && (
+            <div className="dream-loading" role="status" aria-live="polite">
+              <div className="dream-spinner" aria-hidden="true" />
+              <p>Turning your photo into a robot&hellip; &#x2728;</p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ─────────────────────── Pick One Panel ─────────────────────── */
+function PickOnePanel({ presets, selectedPreset, onPreset, onSwitchMode }) {
+  return (
+    <section className="pick-panel" aria-label="Pick a preset">
+      <h3>Pick a robot to build right away</h3>
+      <p className="panel-hint">
+        Choose one of these &mdash; no waiting for AI. Or switch to voice or camera for a unique build!
+      </p>
+
+      <div className="template-grid" role="group" aria-label="Preset robots">
+        {presets.map((model) => (
+          <button
+            key={model.id}
+            className={`template-card ${selectedPreset === model.id ? 'picked' : ''}`}
+            onClick={() => onPreset(model)}
+            aria-label={`${model.name}, ${model.difficulty}, ${model.pieceCount} pieces`}
+            aria-pressed={selectedPreset === model.id}
+          >
+            <div className="template-emoji" aria-hidden="true">{model.emoji}</div>
+            <div className="template-name">{model.name}</div>
+            <div className="template-diff">{model.difficulty} &middot; {model.pieceCount} pieces</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="pick-switch-row">
+        <span className="pick-switch-label">Want a totally unique robot?</span>
+        <button className="pick-switch-btn" onClick={() => onSwitchMode('voice')}>
+          &#x1F3A4; Talk to Me
+        </button>
+        <button className="pick-switch-btn" onClick={() => onSwitchMode('camera')}>
+          &#x1F4F8; Show Me
+        </button>
+      </div>
+    </section>
   );
 }
