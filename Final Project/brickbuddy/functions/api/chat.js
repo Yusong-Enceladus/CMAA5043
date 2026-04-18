@@ -12,34 +12,30 @@
  */
 
 /**
- * Fallback chain — strictly ordered by intelligence among the OpenRouter
- * free tier (verified April 2026). Order is tried top-down; first model
- * that doesn't return 429/5xx wins. GLM-4.5-Air and Nemotron-Nano-9B
- * deliberately removed; they benchmark well below the current crop.
+ * Chat chain — ordered for KID-FACING quality, not raw intelligence.
+ * Nemotron 3 Super is the smartest free model but leaks chain-of-thought
+ * as plain text (no <think> tags) even with "respond only" instructions,
+ * which is unusable for 6-8yo chat. Gemma 4 + Llama 3.3 follow tone
+ * constraints reliably.
  */
 const DEFAULT_MODELS = [
-  'nvidia/nemotron-3-super-120b-a12b:free',   // Q1 2026 top open reasoning
-  'google/gemma-4-31b-it:free',               // Q1 2026 dense 31B — warm, family-safe default
-  'qwen/qwen3-next-80b-a3b-instruct:free',    // Arena ~1422 ELO tier, instruct-tuned (not thinking)
-  'openai/gpt-oss-120b:free',                 // frontier-ish MoE, strong refusals for kid safety
-  'meta-llama/llama-3.3-70b-instruct:free',   // stability anchor — huge ecosystem
-  'google/gemma-3-27b-it:free',               // safest last resort — gentle alignment for kids
+  'google/gemma-4-31b-it:free',               // warm, family-safe, reliable tone
+  'meta-llama/llama-3.3-70b-instruct:free',   // predictable, no CoT leakage
+  'openai/gpt-oss-120b:free',                 // strong refusals for kid safety
+  'qwen/qwen3-next-80b-a3b-instruct:free',    // instruct-tuned variant (non-thinking)
+  'google/gemma-3-27b-it:free',               // gentle last-resort fallback
+  // Nemotron 3 Super intentionally omitted — leaks plain-text reasoning.
 ];
 
-// JSON-generation chain — Nemotron 3 Super leaks plain-text reasoning even
-// without <think> tags, so it's demoted. Llama 3.3 and Gemma 4 follow the
-// "respond only with JSON" instruction reliably.
+// JSON-generation chain — same principle. Models that follow "JSON only"
+// strictly come first. Nemotron / Qwen-thinking are excluded: they burn
+// the token budget on reasoning before emitting any JSON.
 const JSON_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'google/gemma-4-31b-it:free',
   'openai/gpt-oss-120b:free',
   'google/gemma-3-27b-it:free',
-  // Last-resort fallbacks: these models leak reasoning, but the client-side
-  // `{...}` regex still finds the JSON as long as one appears anywhere in
-  // the response. Better than returning "all models unavailable" during
-  // free-tier outages.
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'nvidia/nemotron-3-super-120b-a12b:free',
+  'qwen/qwen3-next-80b-a3b-instruct:free',    // last resort; regex extracts JSON from prose
 ];
 
 const MAX_MESSAGES = 12;
@@ -91,6 +87,11 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTok
         messages,
         temperature,
         max_tokens: maxTokens,
+        // Ask OpenRouter to hide reasoning tokens from reasoning-capable
+        // models. Only takes effect when a model exposes reasoning as a
+        // separate field — models that inline CoT in `content` need the
+        // `stripThinking` pass below.
+        reasoning: { exclude: true },
       }),
       signal: controller.signal,
     });
@@ -112,17 +113,47 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTok
 }
 
 /**
- * Strip common chain-of-thought / scratchpad markers leaked by some models
- * (Nemotron-thinking, Qwen-thinking, DeepSeek-R1 style).
+ * Strip chain-of-thought / scratchpad markers leaked by reasoning models
+ * (Nemotron 3 Super, Qwen-thinking, DeepSeek-R1 style). Handles both
+ * tag-wrapped reasoning and untagged plain-text preambles.
  */
 function stripThinking(text) {
   let out = text;
-  // <think>...</think>, <reasoning>...</reasoning>, <|thinking|>...<|/thinking|>
+
+  // 1. Tag-wrapped: <think>...</think>, <reasoning>...</reasoning>, etc.
   out = out.replace(/<\s*(think|reasoning|analysis|scratchpad|thought)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
   out = out.replace(/<\|thinking\|>[\s\S]*?<\|\/thinking\|>/gi, '');
   out = out.replace(/<\|reasoning\|>[\s\S]*?<\|\/reasoning\|>/gi, '');
-  // Sometimes models dump "Thinking:" or "Reasoning:" sections before the answer.
+
+  // 2. Untagged preambles: "Thinking: ... ", "Reasoning: ..."
   out = out.replace(/^(?:Thinking|Reasoning|Analysis|Scratchpad|Thought)\s*:[\s\S]*?\n(?=[A-Z])/im, '');
+
+  // 3. Conversational reasoning openers — Nemotron 3 Super frequently starts
+  //    responses with "Okay, the user is asking about X." or "Hmm, a 7-year-old..."
+  //    and spends a paragraph reasoning before the real answer. Strip up to the
+  //    last paragraph if the response starts with one of these patterns.
+  const REASONING_OPENERS = [
+    /^Okay,\s+the user/i,
+    /^Hmm,\s+/i,
+    /^Let me think/i,
+    /^Let's think/i,
+    /^We need to\b/i,
+    /^First,\s+let me/i,
+    /^I need to/i,
+    /^Alright,\s+so the/i,
+    /^The user is asking/i,
+  ];
+  const looksLikeReasoning = REASONING_OPENERS.some((re) => re.test(out));
+  if (looksLikeReasoning) {
+    // If there's a blank line (paragraph break), keep only what comes after the LAST
+    // reasoning paragraph. Reasoning is typically one or two paragraphs.
+    const paragraphs = out.split(/\n\s*\n/);
+    if (paragraphs.length > 1) {
+      // Keep the last paragraph as the "final answer".
+      out = paragraphs[paragraphs.length - 1];
+    }
+  }
+
   return out.trim();
 }
 
