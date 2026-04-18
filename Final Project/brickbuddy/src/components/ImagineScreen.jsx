@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { robotModels } from '../data/models';
 import { analyzePhoto } from '../services/imageAnalyzer';
-import { generateCustomRobot, customizeModel } from '../services/aiService';
+import { generateFullRobot, generateCustomRobot, customizeModel } from '../services/aiService';
 import { playClick, playSuccess } from '../services/soundEffects';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useCamera from '../hooks/useCamera';
@@ -136,6 +136,20 @@ export default function ImagineScreen() {
     setDreamError(null);
     setDreaming(true);
     setChildInput(text);
+
+    // Try true AI geometry first; if validation fails, fall back to recolored template.
+    try {
+      const custom = await generateFullRobot(text);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `I dreamed up a ${custom.name} ${custom.emoji} — built just for your idea! ${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+      return;
+    } catch (err) {
+      if (import.meta.env.DEV) console.info('[Dream] full-geometry failed, falling back:', err.message);
+    }
+
     try {
       const blueprint = await generateCustomRobot(text);
       const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
@@ -149,7 +163,7 @@ export default function ImagineScreen() {
       setDreamError(
         "I couldn't dream that up right now. Try a simpler idea like 'a green robot frog' or pick a template below.",
       );
-      if (import.meta.env.DEV) console.warn('[Dream]', err);
+      if (import.meta.env.DEV) console.warn('[Dream] both paths failed:', err);
     } finally {
       setDreaming(false);
     }

@@ -44,6 +44,171 @@ function parseSteamTag(text) {
   return { clean, tag: STEAM_TAGS.includes(tag) ? tag : null };
 }
 
+import { resolveSteps, validateBlueprint, derivePiecesFromBricks } from './brickResolver';
+
+/* ─────────── Full-geometry generation (primary path) ──────────── */
+
+const BLUEPRINT_SYSTEM_PROMPT = `You are an architect designing LEGO robot blueprints for children aged 6-8.
+
+The child will describe any robot they can imagine. You return a BRICK-BY-BRICK blueprint the child can follow step by step.
+
+You DO NOT compute world coordinates. Instead you place each brick RELATIVE to either the ground or an earlier brick you named with an "id".
+
+BRICK SCHEMA (every brick must match this exactly):
+{
+  "id": "short-lowercase-id",          // unique across the whole build
+  "type": "plate" | "brick" | "tile" | "slope",
+  "on":   "ground" | "<id of an earlier brick>",
+  "offset": [dx, dz],                  // studs from the parent's CENTER on the X and Z axes (0,0 = centered on parent)
+  "w": integer 1-6,                    // width in studs
+  "d": integer 1-10,                   // depth in studs
+  "color": "#RRGGBB"
+}
+
+PHYSICS RULES (enforced — wrong output is rejected):
+- The FIRST brick of the build must have "on":"ground".
+- Every other brick's "on" must reference a brick whose id appeared in a prior step OR earlier in the SAME step.
+- offset is [dx, dz] ONLY — Y is automatic (the brick sits on top of its parent).
+- ids use lowercase letters, digits, dashes, underscores only.
+
+BUILD RULES:
+- 5 to 7 steps.
+- Each step has 1 to 5 new bricks.
+- pieceCount (total bricks) between 18 and 40.
+- Name: 2-4 fun words. Emoji: 1 emoji that matches.
+- Use primaryColor for 60%+ of bricks and accentColor for 25%+ for visual cohesion.
+- desc is ONE warm kid-friendly sentence; tip is ONE STEAM fact.
+- steamTag for each step: one of "science" | "technology" | "engineering" | "art" | "math".
+
+Return ONLY this JSON object — no markdown, no prose:
+{
+  "name": "...",
+  "emoji": "...",
+  "difficulty": "Easy" | "Medium" | "Hard",
+  "description": "...",
+  "primaryColor": "#RRGGBB",
+  "accentColor":  "#RRGGBB",
+  "pieceCount": integer,
+  "steps": [
+    {
+      "num": 1,
+      "title": "...",
+      "emoji": "...",
+      "desc": "...",
+      "tip":  "...",
+      "steamTag": "engineering",
+      "bricks": [
+        { "id":"base","type":"plate","on":"ground","offset":[0,0],"w":4,"d":6,"color":"#..." }
+      ]
+    }
+  ]
+}`;
+
+export async function generateFullRobot(description) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'json',
+      messages: [
+        { role: 'system', content: BLUEPRINT_SYSTEM_PROMPT },
+        { role: 'user',   content: description },
+      ],
+      temperature: 0.65,
+    }),
+  });
+  if (!res.ok) throw new Error(`generate failed: ${res.status}`);
+  const data = await res.json();
+  if (!data.text) throw new Error('empty response');
+
+  const cleaned = data.text.replace(/^```(?:json)?\s*|\s*```$/gim, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('no JSON in response');
+
+  let bp;
+  try {
+    bp = JSON.parse(match[0]);
+  } catch (e) {
+    throw new Error(`JSON parse failed: ${e.message}`);
+  }
+
+  validateBlueprint(bp);
+  const resolvedSteps = resolveSteps(bp.steps);
+
+  // Derive `pieces` list per step from the raw bricks (nicer for the UI).
+  resolvedSteps.forEach((s, i) => {
+    if (!s.pieces || s.pieces.length === 0) {
+      s.pieces = derivePiecesFromBricks(bp.steps[i].bricks);
+    }
+  });
+
+  return {
+    id: `custom-${Date.now()}`,
+    name: bp.name,
+    emoji: bp.emoji,
+    difficulty: bp.difficulty,
+    pieceCount: bp.pieceCount,
+    color: bp.color || bp.primaryColor,
+    description: bp.description,
+    steps: resolvedSteps,
+  };
+}
+
+/**
+ * Regenerate JUST ONE step of an existing custom model. The AI sees the
+ * surrounding context (step title + what came before) and returns a new
+ * `bricks` array for that step, keyed against the same brick graph so
+ * later steps keep working.
+ */
+export async function regenerateStep(model, stepIndex) {
+  const step = model.steps[stepIndex];
+  if (!step) throw new Error('bad step index');
+
+  // Collect all brick ids declared in earlier steps so the AI can reference them.
+  const priorIds = [];
+  for (let i = 0; i < stepIndex; i++) {
+    for (const p of model.steps[i].newParts || []) {
+      // We no longer have the original ids after resolving, so approximate with step+index.
+      priorIds.push(`step${i + 1}-${priorIds.length}`);
+    }
+  }
+
+  const system = `${BLUEPRINT_SYSTEM_PROMPT}
+
+You are ONLY redoing step ${step.num}: "${step.title}".
+Return a JSON object: { "bricks": [ ... ] }. No other keys. No prose.
+You may reference "ground" as a parent.`;
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'json',
+      messages: [
+        { role: 'system', content: system },
+        {
+          role: 'user',
+          content: `The robot is "${model.name}" ${model.emoji}. This step should: ${step.desc || step.title}. Use primary color ${model.color}. Give 1-5 bricks.`,
+        },
+      ],
+      temperature: 0.75,
+    }),
+  });
+  if (!res.ok) throw new Error(`regenerate failed: ${res.status}`);
+  const data = await res.json();
+  if (!data.text) throw new Error('empty response');
+
+  const cleaned = data.text.replace(/^```(?:json)?\s*|\s*```$/gim, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('no JSON in response');
+  const parsed = JSON.parse(match[0]);
+  if (!Array.isArray(parsed.bricks)) throw new Error('missing bricks array');
+
+  // Resolve in isolation (each brick must use "ground" since we don't know prior ids).
+  const resolved = resolveSteps([{ ...step, bricks: parsed.bricks }]);
+  return resolved[0];
+}
+
 /**
  * Generate a custom robot blueprint from a free-text description.
  * Returns { name, emoji, template, description, primaryColor, accentColor, pieceCount }.
@@ -93,11 +258,11 @@ Respond with ONLY a JSON object in this exact shape — no markdown fences, no p
   if (!jsonMatch) throw new Error('no JSON in response');
 
   const blueprint = JSON.parse(jsonMatch[0]);
-  validateBlueprint(blueprint);
+  validateRecolorBlueprint(blueprint);
   return blueprint;
 }
 
-function validateBlueprint(bp) {
+function validateRecolorBlueprint(bp) {
   const required = ['name', 'emoji', 'template', 'description', 'primaryColor', 'accentColor'];
   for (const k of required) {
     if (!bp[k] || typeof bp[k] !== 'string') throw new Error(`blueprint missing ${k}`);

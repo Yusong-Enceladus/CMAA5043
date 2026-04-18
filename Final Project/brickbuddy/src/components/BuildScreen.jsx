@@ -6,17 +6,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { getSmartAIResponse, getStepWelcome, hasAIKey } from '../services/chatEngine';
+import { regenerateStep } from '../services/aiService';
 import { playClick, playStepComplete, playChatReceive } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
+import StepEditor from './StepEditor';
 import './BuildScreen.css';
 
 export default function BuildScreen() {
   const {
     selectedModel, currentStep, nextStep, prevStep, setStage,
     chatHistory, addChat, progress, soundEnabled,
+    updateStepParts, updateSelectedModel,
   } = useBuild();
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const chatEndRef = useRef(null);
   const prevStepRef = useRef(currentStep);
 
@@ -82,6 +86,44 @@ export default function BuildScreen() {
     prevStep();
   };
 
+  // ─── Editor actions (apply immutable updates to the current step's parts) ─
+  const deletePart = (partIndex) => {
+    if (soundEnabled) playClick();
+    updateStepParts(currentStep, (parts) => parts.filter((_, i) => i !== partIndex));
+  };
+
+  const recolorPart = (partIndex, newColor) => {
+    updateStepParts(currentStep, (parts) =>
+      parts.map((p, i) => (i === partIndex ? { ...p, color: newColor } : p)),
+    );
+  };
+
+  const addPart = (newPart) => {
+    if (soundEnabled) playClick();
+    updateStepParts(currentStep, (parts) => [...parts, newPart]);
+  };
+
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState(null);
+  const regenerateCurrentStep = async () => {
+    setRegenError(null);
+    setRegenerating(true);
+    try {
+      const fresh = await regenerateStep(selectedModel, currentStep);
+      updateSelectedModel((m) => {
+        const copy = structuredClone(m);
+        copy.steps[currentStep] = { ...copy.steps[currentStep], ...fresh };
+        return copy;
+      });
+      if (soundEnabled) playStepComplete();
+    } catch (err) {
+      setRegenError("Couldn't regenerate that step right now. Try again in a moment.");
+      if (import.meta.env.DEV) console.warn('[regen]', err);
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   return (
     <div className="build-screen" role="main" aria-label={`Building ${selectedModel.name}`}>
       <header className="build-header">
@@ -128,6 +170,30 @@ export default function BuildScreen() {
                 {p.name}
               </div>
             ))}
+          </div>
+
+          {editorOpen && (
+            <StepEditor
+              parts={step.newParts || []}
+              onDelete={deletePart}
+              onRecolor={recolorPart}
+              onAdd={addPart}
+              onRegenerate={regenerateCurrentStep}
+              regenerating={regenerating}
+              error={regenError}
+              primaryColor={selectedModel.color}
+            />
+          )}
+
+          <div className="edit-toggle-row">
+            <button
+              className={`edit-toggle-btn ${editorOpen ? 'open' : ''}`}
+              onClick={() => setEditorOpen((v) => !v)}
+              aria-expanded={editorOpen}
+              aria-label={editorOpen ? 'Close step editor' : 'Open step editor'}
+            >
+              {editorOpen ? '\u2715 Close Editor' : '\u{1F6E0} Edit This Step'}
+            </button>
           </div>
 
           <nav className="step-nav" aria-label="Step navigation">

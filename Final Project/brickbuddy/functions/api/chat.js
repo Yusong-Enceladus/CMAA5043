@@ -34,6 +34,12 @@ const JSON_MODELS = [
   'google/gemma-4-31b-it:free',
   'openai/gpt-oss-120b:free',
   'google/gemma-3-27b-it:free',
+  // Last-resort fallbacks: these models leak reasoning, but the client-side
+  // `{...}` regex still finds the JSON as long as one appears anywhere in
+  // the response. Better than returning "all models unavailable" during
+  // free-tier outages.
+  'qwen/qwen3-next-80b-a3b-instruct:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
 ];
 
 const MAX_MESSAGES = 12;
