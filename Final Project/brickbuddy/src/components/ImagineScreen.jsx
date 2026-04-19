@@ -1,19 +1,8 @@
 /**
- * ImagineScreen — The home hub. Three entry points:
- *   1. Talk to Me  — voice → transcript → Confirm → AI generates a custom robot.
- *   2. Show Me     — camera → photo → Retake/Confirm → AI generates from photo.
- *   3. Pick One    — 3 ready-made presets; can also jump to Talk/Show.
- *
- * Voice UX: a single mic button whose icon represents state
- *   - 🎤  empty (waiting for input) → tap to start recording
- *   - ⏹   listening → tap to stop
- *   - 🔄  has transcript → tap to re-record (replaces the old Retry button)
- * The only other control is the central Confirm button, which appears once a
- * transcript exists.
- *
- * AI fallback: if both /api/chat paths fail (throttled free-tier, offline,
- * server down), we generate a custom robot LOCALLY so the child always gets
- * a build. This was added after OpenRouter's free tier kept rate-limiting.
+ * ImagineScreen — Redesigned entry. One headline, three modes (Talk / Type / Show)
+ * plus a row of preset cards below. The underlying AI-generation pipeline
+ * (full geometry → recolor blueprint → local fallback) is preserved — only the
+ * surface layer is new.
  */
 import { useEffect, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
@@ -24,11 +13,19 @@ import { generateLocally } from '../services/localRobotGen';
 import { playClick, playSuccess } from '../services/soundEffects';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useCamera from '../hooks/useCamera';
-import './ImagineScreen.css';
+import { BuddyFace, VoiceWave, TypingDots } from '../design/Buddy';
+import { Btn, Card, Chip, Display, Kicker, PieceDot, TopBar } from '../design/UI';
+
+const MODES = [
+  { k: 'voice',  label: '\u{1F3A4} Talk' },
+  { k: 'text',   label: '\u2328\uFE0F Type' },
+  { k: 'camera', label: '\u{1F4F8} Show' },
+];
 
 export default function ImagineScreen() {
-  const { selectModel, setStage, progress, soundEnabled } = useBuild();
-  const [mode, setMode] = useState(null);
+  const { selectModel, setStage, soundEnabled } = useBuild();
+  const [mode, setMode] = useState('voice');
+  const [typed, setTyped] = useState('');
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null);
   const [aiResponse, setAiResponse] = useState('');
@@ -39,37 +36,101 @@ export default function ImagineScreen() {
 
   useEffect(() => {
     if (camera.isActive) camera.attachVideoToStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera.isActive, camera.attachVideoToStream]);
 
-  const handleModeSelect = (next) => {
-    if (soundEnabled) playClick();
+  const hasTranscript = speech.transcript.trim().length > 0;
+
+  const resetAll = () => {
     camera.stopCamera();
     camera.setPhoto(null);
+    camera.clearError();
     speech.stopListening();
     speech.resetTranscript();
     speech.clearError();
-    camera.clearError();
     setAiResponse('');
     setGenError(null);
     setSelectedPreset(null);
+    setTyped('');
+  };
+
+  const handleModeSelect = (next) => {
+    if (soundEnabled) playClick();
+    resetAll();
     setMode(next);
   };
 
   const handleBack = () => {
-    camera.stopCamera();
-    speech.stopListening();
+    resetAll();
     setStage('splash');
   };
 
-  /* ───────── Voice flow (single-button icon state) ───────── */
-  const hasTranscript = speech.transcript.trim().length > 0;
+  /* ───────── Shared AI-generation path ───────── */
+  const generateFromText = async (text, photoAnalysis = null) => {
+    if (!text) {
+      setGenError("I didn't catch that. Try again!");
+      return;
+    }
+    setGenerating(true);
+    setGenError(null);
+    setAiResponse('Designing your robot\u2026');
 
+    const prompt = photoAnalysis
+      ? `${text} (Hint: looks closest to a ${photoAnalysis.modelId}.)`
+      : text;
+
+    try {
+      const custom = await generateFullRobot(prompt);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `I made a ${custom.name} ${custom.emoji} just for you! ` +
+        `${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+      setGenerating(false);
+      return;
+    } catch (err) {
+      console.warn('[BrickBuddy] Path 1 (full AI geometry) failed:', err?.message || err);
+    }
+
+    try {
+      const blueprint = await generateCustomRobot(prompt);
+      const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
+      const custom = customizeModel(base, blueprint);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `Here's a ${custom.name} ${custom.emoji} inspired by your idea! ${custom.description} ` +
+        `It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+      setGenerating(false);
+      return;
+    } catch (err) {
+      console.warn('[BrickBuddy] Path 2 (recolor preset) failed:', err?.message || err);
+    }
+
+    try {
+      const custom = generateLocally(text, photoAnalysis);
+      selectModel(custom);
+      if (soundEnabled) playSuccess();
+      setAiResponse(
+        `A brand-new ${custom.name} ${custom.emoji} — ${custom.description} ` +
+        `${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
+      );
+    } catch (err) {
+      setGenError('Something went wrong. Try Pick One instead!');
+      if (import.meta.env.DEV) console.error('[Imagine] all paths failed:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /* ───────── Voice flow ───────── */
   const handleMicTap = () => {
     if (soundEnabled) playClick();
     if (speech.isListening) {
       speech.stopListening();
     } else {
-      // Either "start fresh" OR "re-record". In both cases, clear state and start.
       speech.resetTranscript();
       speech.clearError();
       setAiResponse('');
@@ -82,6 +143,12 @@ export default function ImagineScreen() {
     if (soundEnabled) playClick();
     speech.stopListening();
     await generateFromText(speech.transcript.trim());
+  };
+
+  /* ───────── Text flow ───────── */
+  const handleTextConfirm = async () => {
+    if (soundEnabled) playClick();
+    await generateFromText(typed.trim());
   };
 
   /* ───────── Camera flow ───────── */
@@ -104,85 +171,17 @@ export default function ImagineScreen() {
     if (soundEnabled) playClick();
     setGenerating(true);
     setGenError(null);
-    setAiResponse('Looking at your photo\u2026 \u{1F50D}');
+    setAiResponse('Looking at your photo\u2026');
     try {
       const analysis = await analyzePhoto(camera.photo);
       const description = `A robot inspired by this picture. Detected: ${analysis.reason}.`;
       await generateFromText(description, analysis);
     } catch {
-      // Even image analysis failed — still fall back to local generation with a
-      // generic description so the build flow never dead-ends.
       await generateFromText('a robot inspired by my photo');
     }
   };
 
-  /* ───────── Shared AI-generation path ───────── */
-  const generateFromText = async (text, photoAnalysis = null) => {
-    if (!text) {
-      setGenError("I didn't catch that. Try again!");
-      return;
-    }
-    setGenerating(true);
-    setGenError(null);
-    setAiResponse('Designing your robot\u2026');
-
-    const prompt = photoAnalysis
-      ? `${text} (Hint: looks closest to a ${photoAnalysis.modelId}.)`
-      : text;
-
-    // Path 1: full AI geometry. Log any failure — we've been burned too many
-    // times by silent fallbacks that leave the user confused about why they
-    // got a procedural robot when the API was reachable.
-    try {
-      const custom = await generateFullRobot(prompt);
-      selectModel(custom);
-      if (soundEnabled) playSuccess();
-      setAiResponse(
-        `I made a ${custom.name} ${custom.emoji} just for you! ` +
-        `${custom.description} ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
-      );
-      setGenerating(false);
-      return;
-    } catch (err) {
-      console.warn('[BrickBuddy] Path 1 (full AI geometry) failed:', err?.message || err, err);
-    }
-
-    // Path 2: AI blueprint + recolor a preset.
-    try {
-      const blueprint = await generateCustomRobot(prompt);
-      const base = robotModels.find((m) => m.id === blueprint.template) || robotModels[0];
-      const custom = customizeModel(base, blueprint);
-      selectModel(custom);
-      if (soundEnabled) playSuccess();
-      setAiResponse(
-        `Here's a ${custom.name} ${custom.emoji} inspired by your idea! ${custom.description} ` +
-        `It has ${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
-      );
-      setGenerating(false);
-      return;
-    } catch (err) {
-      console.warn('[BrickBuddy] Path 2 (recolor preset) failed:', err?.message || err);
-    }
-
-    // Path 3: local, offline fallback. ALWAYS succeeds.
-    try {
-      const custom = generateLocally(text, photoAnalysis);
-      selectModel(custom);
-      if (soundEnabled) playSuccess();
-      setAiResponse(
-        `A brand-new ${custom.name} ${custom.emoji} — ${custom.description} ` +
-        `${custom.pieceCount} pieces across ${custom.steps.length} steps. Let's build it!`,
-      );
-    } catch (err) {
-      // Local can only fail if data/models.js is missing — true last-resort.
-      setGenError('Something went wrong. Try Pick One instead!');
-      if (import.meta.env.DEV) console.error('[Imagine] all paths failed:', err);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  /* ───────── Pick One flow ───────── */
+  /* ───────── Preset flow ───────── */
   const handlePreset = (model) => {
     if (soundEnabled) playClick();
     setSelectedPreset(model.id);
@@ -202,283 +201,312 @@ export default function ImagineScreen() {
   };
 
   const showStartBtn = aiResponse && !generating && !genError && (
-    (mode === 'pick' && selectedPreset) ||
-    (mode === 'voice' && !speech.isListening) ||
+    selectedPreset ||
+    (mode === 'voice' && hasTranscript) ||
+    (mode === 'text' && typed.trim()) ||
     (mode === 'camera' && camera.photo)
   );
 
   return (
-    <div className="imagine-screen" role="main" aria-label="Choose how to start">
-      <header className="imagine-header">
-        <button className="back-btn" onClick={handleBack} aria-label="Go back to home">
-          <span aria-hidden="true">&larr;</span>
-        </button>
-        <span className="logo-small" aria-hidden="true">Brick<span>Buddy</span></span>
-        <div className="progress-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
+    <div className="bb-screen" role="main" aria-label="Choose how to start">
+      <TopBar onBack={handleBack} progressLabel="STAGE 1 · IMAGINE">
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <Chip bg="var(--live-soft)" color="var(--live)">
+            <BuddyFace size={18} state="listening" />&nbsp;Buddy is ready
+          </Chip>
         </div>
-        <span className="stage-label">Stage 1: Imagine</span>
-      </header>
+      </TopBar>
 
-      <div className="imagine-content">
-        <div className="buddy-chat" role="status" aria-live="polite">
-          <div className="buddy-avatar" aria-hidden="true">&#x1F916;</div>
-          <div className="buddy-bubble">
-            Hi there! &#x1F44B; What robot do you want to build today?<br />
-            Pick <strong>Talk to Me</strong>, <strong>Show Me</strong>, or <strong>Pick One</strong>.
+      <div style={{
+        flex: 1, display: 'grid', placeItems: 'center', padding: '24px 20px 48px',
+        background: 'radial-gradient(ellipse at 50% 0%, #FFE0CC 0%, #FFF6EC 60%)',
+      }}>
+        <div style={{ width: '100%', maxWidth: 900, display: 'grid', gap: 28, justifyItems: 'center' }}>
+          <Display size="lg" style={{ textAlign: 'center' }}>
+            What do you want to build{' '}
+            <span style={{ color: 'var(--brick-red)' }}>today?</span>
+          </Display>
+
+          <p style={{ color: 'var(--ink-3)', fontSize: 18, margin: 0, textAlign: 'center', maxWidth: 560 }}>
+            Tell Buddy out loud, type it, or snap a picture of what you&apos;re imagining.
+          </p>
+
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: 8, padding: 4, background: 'rgba(26,20,16,0.06)', borderRadius: 999 }}>
+            {MODES.map(o => (
+              <button
+                key={o.k}
+                onClick={() => handleModeSelect(o.k)}
+                aria-pressed={mode === o.k}
+                style={{
+                  padding: '10px 20px', borderRadius: 999, fontWeight: 700, fontSize: 14,
+                  background: mode === o.k ? 'var(--card)' : 'transparent',
+                  color: mode === o.k ? 'var(--ink)' : 'var(--ink-3)',
+                  boxShadow: mode === o.k ? '0 2px 8px rgba(26,20,16,0.1)' : 'none',
+                }}>
+                {o.label}
+              </button>
+            ))}
           </div>
-        </div>
 
-        <div className="input-cards" role="group" aria-label="Choose a mode">
-          <button
-            className={`input-card ${mode === 'voice' ? 'selected' : ''}`}
-            onClick={() => handleModeSelect('voice')}
-            aria-pressed={mode === 'voice'}
-          >
-            <div className="input-icon" aria-hidden="true">&#x1F3A4;</div>
-            <h3>Talk to Me</h3>
-            <p>Tell me ANY robot &mdash; AI builds it!</p>
-          </button>
-          <button
-            className={`input-card ${mode === 'camera' ? 'selected' : ''}`}
-            onClick={() => handleModeSelect('camera')}
-            aria-pressed={mode === 'camera'}
-          >
-            <div className="input-icon" aria-hidden="true">&#x1F4F8;</div>
-            <h3>Show Me</h3>
-            <p>Snap a photo &mdash; AI builds from it!</p>
-          </button>
-          <button
-            className={`input-card ${mode === 'pick' ? 'selected' : ''}`}
-            onClick={() => handleModeSelect('pick')}
-            aria-pressed={mode === 'pick'}
-          >
-            <div className="input-icon" aria-hidden="true">&#x1F9E9;</div>
-            <h3>Pick One</h3>
-            <p>Choose from 3 ready-to-build robots!</p>
-          </button>
-        </div>
-
-        {mode === 'voice' && (
-          <VoicePanel
-            speech={speech}
-            generating={generating}
-            hasTranscript={hasTranscript}
-            onMicTap={handleMicTap}
-            onConfirm={handleVoiceConfirm}
-          />
-        )}
-
-        {mode === 'camera' && (
-          <CameraPanel
-            camera={camera}
-            generating={generating}
-            onTake={handleTakePhoto}
-            onRetake={handleRetake}
-            onConfirm={handlePhotoConfirm}
-          />
-        )}
-
-        {mode === 'pick' && (
-          <PickOnePanel
-            presets={robotModels}
-            selectedPreset={selectedPreset}
-            onPreset={handlePreset}
-            onSwitchMode={handleModeSelect}
-          />
-        )}
-
-        {genError && <p className="warning" role="alert">{genError}</p>}
-
-        {aiResponse && (
-          <div className="buddy-chat" role="status" aria-live="polite">
-            <div className="buddy-avatar" aria-hidden="true">&#x1F916;</div>
-            <div className="buddy-bubble">{aiResponse}</div>
+          <div style={{ width: '100%', display: 'grid', placeItems: 'center', gap: 18 }}>
+            {mode === 'voice' && (
+              <VoicePrimary
+                speech={speech}
+                generating={generating}
+                hasTranscript={hasTranscript}
+                onMicTap={handleMicTap}
+                onConfirm={handleVoiceConfirm}
+              />
+            )}
+            {mode === 'text' && (
+              <TextPrimary
+                value={typed} setValue={setTyped}
+                onConfirm={handleTextConfirm}
+                thinking={generating}
+              />
+            )}
+            {mode === 'camera' && (
+              <PhotoPrimary
+                camera={camera}
+                generating={generating}
+                onTake={handleTakePhoto}
+                onRetake={handleRetake}
+                onConfirm={handlePhotoConfirm}
+              />
+            )}
           </div>
-        )}
 
-        {showStartBtn && (
-          <button className="start-build-btn" onClick={handleStartBuild}>
-            Start Building! &#x1F528;
-          </button>
-        )}
+          {/* Presets */}
+          <div style={{ width: '100%', marginTop: 4 }}>
+            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+              <Kicker color="var(--ink-3)">or start from a template</Kicker>
+            </div>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 12,
+            }}>
+              {robotModels.map(m => (
+                <PresetCard
+                  key={m.id}
+                  model={m}
+                  picked={selectedPreset === m.id}
+                  onPick={() => handlePreset(m)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {genError && (
+            <p role="alert" style={{
+              color: 'var(--warn)', background: 'rgba(224,112,27,0.08)',
+              padding: '10px 14px', borderRadius: 12, margin: 0, fontWeight: 600,
+            }}>{genError}</p>
+          )}
+
+          {aiResponse && (
+            <Card pad={16} style={{ display: 'flex', gap: 12, maxWidth: 620 }}>
+              <BuddyFace size={42} state="speaking" />
+              <div style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--ink)' }}>
+                {aiResponse}
+              </div>
+            </Card>
+          )}
+
+          {showStartBtn && (
+            <Btn variant="brick" size="lg" onClick={handleStartBuild}
+              icon={<span>&#x1F528;</span>} aria-label="Start building">
+              Start Building
+            </Btn>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ─────────────────────── Voice Panel ─────────────────────── */
-function VoicePanel({ speech, generating, hasTranscript, onMicTap, onConfirm }) {
-  const micState = speech.isListening
-    ? 'listening'
-    : hasTranscript
-      ? 'has-content'
-      : 'empty';
-  const micIcon = {
-    empty:       '\u{1F3A4}', // 🎤 — waiting for input
-    listening:   '\u23F9',    // ⏹  — tap to stop
-    'has-content': '\u{1F504}', // 🔄 — tap to re-record
-  }[micState];
-  const micLabel = {
-    empty:       'Start recording',
-    listening:   'Stop recording',
-    'has-content': 'Re-record',
-  }[micState];
+/* ───────── Voice primary ───────── */
+function VoicePrimary({ speech, generating, hasTranscript, onMicTap, onConfirm }) {
+  const active = speech.isListening;
+  const state = active ? 'listening' : hasTranscript ? 'has-content' : generating ? 'thinking' : 'idle';
 
   return (
-    <section className="voice-panel" aria-label="Voice input">
+    <Card pad={32} style={{ width: '100%', maxWidth: 620, display: 'grid', gap: 18, justifyItems: 'center' }}>
       {!speech.isSupported && (
-        <p className="warning" role="alert">
-          Voice isn&apos;t supported in this browser. Try Chrome, Edge, or Safari &mdash; or use <strong>Show Me</strong> / <strong>Pick One</strong>.
+        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center' }}>
+          Voice isn&apos;t supported here. Try Chrome, Edge, or Safari — or use Type / Show.
+        </p>
+      )}
+      {speech.error && (
+        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center' }}>
+          {speech.error}
         </p>
       )}
 
-      {speech.error && <p className="warning" role="alert">{speech.error}</p>}
-
-      {speech.isSupported && (
-        <>
-          {speech.isListening && (
-            <div className="voice-wave" aria-hidden="true">
-              {[...Array(7)].map((_, i) => (
-                <div key={i} className="bar" style={{ animationDelay: `${i * 0.1}s` }} />
-              ))}
-            </div>
-          )}
-
-          <button
-            className={`mic-btn state-${micState}`}
-            onClick={onMicTap}
-            disabled={generating}
-            aria-label={micLabel}
-            title={micLabel}
-          >
-            {micIcon}
-          </button>
-
-          {hasTranscript && !speech.isListening && (
-            <div className="transcript-box" aria-live="polite">
-              &ldquo;{speech.transcript}&rdquo;
-            </div>
-          )}
-
-          {hasTranscript && !speech.isListening && (
-            <button
-              className="confirm-btn"
-              onClick={onConfirm}
-              disabled={generating}
-              aria-label="Use this and build"
-            >
-              {generating ? 'Designing\u2026' : 'Confirm \u2713'}
-            </button>
-          )}
-
-          {generating && (
-            <div className="dream-loading" role="status" aria-live="polite">
-              <div className="dream-spinner" aria-hidden="true" />
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
-
-/* ─────────────────────── Camera Panel ─────────────────────── */
-function CameraPanel({ camera, generating, onTake, onRetake, onConfirm }) {
-  return (
-    <section className="camera-panel" aria-label="Camera input">
-      {camera.error && (
-        <p className="warning" role="alert">
-          {camera.error.message}
-          {camera.error.code === 'denied' && ' Try "Pick One" if you prefer not to share your camera.'}
-        </p>
-      )}
-
-      {!camera.isActive && !camera.photo && !camera.isStarting && (
+      <div style={{ position: 'relative' }}>
         <button
-          className="camera-start-btn"
-          onClick={camera.startCamera}
-          aria-label={camera.error?.code === 'denied' ? 'Retry opening camera' : 'Open camera'}
-        >
-          {camera.error?.code === 'denied' ? '\u{1F504} Try Again' : '\u{1F4F7} Open Camera'}
+          onClick={onMicTap}
+          disabled={generating || !speech.isSupported}
+          aria-label={active ? 'Stop listening' : hasTranscript ? 'Re-record' : 'Start talking'}
+          style={{
+            width: 120, height: 120, borderRadius: 999,
+            background: active ? 'var(--live)' : generating ? 'var(--ink-3)' : 'var(--brick-red)',
+            color: '#FFF', fontSize: 44,
+            boxShadow: active
+              ? '0 6px 0 #1E4FC4, 0 0 0 12px rgba(47,111,235,0.14)'
+              : '0 6px 0 var(--brick-red-d), 0 12px 34px rgba(225,79,59,0.35)',
+            display: 'grid', placeItems: 'center', position: 'relative',
+          }}>
+          {active ? '\u23F9' : hasTranscript ? '\u{1F504}' : '\u{1F3A4}'}
+          {active && <>
+            <span style={{ position: 'absolute', inset: -10, borderRadius: 999, border: '2px solid rgba(47,111,235,0.5)', animation: 'pulseRing 1.4s ease-out infinite' }} />
+            <span style={{ position: 'absolute', inset: -10, borderRadius: 999, border: '2px solid rgba(47,111,235,0.35)', animation: 'pulseRing 1.4s 0.5s ease-out infinite' }} />
+          </>}
         </button>
-      )}
+      </div>
 
-      {camera.isStarting && <p className="voice-status">Asking your browser for camera permission&hellip;</p>}
-
-      {camera.isActive && (
-        <>
-          <div className="camera-preview">
-            <video ref={camera.videoRef} autoPlay playsInline muted aria-label="Camera preview" />
-          </div>
-          <button className="snap-btn" onClick={onTake} aria-label="Take photo">
-            &#x1F4F8;
-          </button>
-        </>
-      )}
-
-      {camera.photo && (
-        <div className="photo-preview">
-          <img src={camera.photo} alt="Your creation" />
-          <div className="confirm-row">
-            <button
-              className="icon-btn"
-              onClick={onRetake}
-              disabled={generating}
-              aria-label="Retake photo"
-              title="Retake photo"
-            >
-              &#x1F504;
-            </button>
-            <button
-              className="confirm-btn"
-              onClick={onConfirm}
-              disabled={generating}
-              aria-label="Use this photo"
-            >
-              {generating ? 'Designing\u2026' : 'Confirm \u2713'}
-            </button>
-          </div>
-
-          {generating && (
-            <div className="dream-loading" role="status" aria-live="polite">
-              <div className="dream-spinner" aria-hidden="true" />
-            </div>
-          )}
+      {state === 'listening' && <VoiceWave active />}
+      {state === 'idle' && (
+        <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 16 }}>
+          Tap the mic and say what you want to build
         </div>
       )}
-    </section>
+      {hasTranscript && (
+        <div style={{
+          fontFamily: 'var(--serif)', fontSize: 26, fontWeight: 700, color: 'var(--ink)',
+          textAlign: 'center', maxWidth: 500, lineHeight: 1.3, letterSpacing: '-0.02em',
+        }}>
+          &ldquo;{speech.transcript}{active && <span style={{ animation: 'fadeIn 0.5s infinite alternate', color: 'var(--live)' }}>|</span>}&rdquo;
+        </div>
+      )}
+      {hasTranscript && !active && !generating && (
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Btn variant="outline" size="md" onClick={onMicTap}>Try again</Btn>
+          <Btn variant="brick"   size="md" onClick={onConfirm} icon="✓">Build this</Btn>
+        </div>
+      )}
+      {generating && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--live)', fontWeight: 600 }}>
+          <TypingDots /> Designing your robot&hellip;
+        </div>
+      )}
+    </Card>
   );
 }
 
-/* ─────────────────────── Pick One Panel ─────────────────────── */
-function PickOnePanel({ presets, selectedPreset, onPreset, onSwitchMode }) {
+/* ───────── Text primary ───────── */
+function TextPrimary({ value, setValue, onConfirm, thinking }) {
   return (
-    <section className="pick-panel" aria-label="Pick a preset">
-      <div className="template-grid" role="group" aria-label="Preset robots">
-        {presets.map((model) => (
-          <button
-            key={model.id}
-            className={`template-card ${selectedPreset === model.id ? 'picked' : ''}`}
-            onClick={() => onPreset(model)}
-            aria-label={`${model.name}, ${model.difficulty}, ${model.pieceCount} pieces`}
-            aria-pressed={selectedPreset === model.id}
-          >
-            <div className="template-emoji" aria-hidden="true">{model.emoji}</div>
-            <div className="template-name">{model.name}</div>
-            <div className="template-diff">{model.difficulty} &middot; {model.pieceCount} pieces</div>
-          </button>
-        ))}
+    <Card pad={24} style={{ width: '100%', maxWidth: 620 }}>
+      <textarea
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="e.g. A friendly robot dog with a drum on its back"
+        aria-label="Describe the robot you want to build"
+        style={{
+          width: '100%', minHeight: 90, border: 'none', outline: 'none',
+          fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 600, color: 'var(--ink)',
+          resize: 'none', background: 'transparent', lineHeight: 1.4,
+        }}
+        autoFocus
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+        <Btn variant="brick" size="md" onClick={onConfirm} disabled={!value.trim() || thinking}>
+          {thinking ? <><TypingDots /> Building…</> : 'Build this →'}
+        </Btn>
+      </div>
+    </Card>
+  );
+}
+
+/* ───────── Photo primary (real camera) ───────── */
+// The videoRef on the camera hook has to flow into the <video> element and
+// reads happen during layout — React's rules-of-refs lint mistakenly flags
+// the whole `camera` object as ref-touched during render, so disable it here.
+/* eslint-disable react-hooks/refs */
+function PhotoPrimary({ camera, generating, onTake, onRetake, onConfirm }) {
+  return (
+    <Card pad={24} style={{ width: '100%', maxWidth: 620, display: 'grid', gap: 12 }}>
+      {camera.error && (
+        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center' }}>
+          {camera.error.message}
+        </p>
+      )}
+
+      <div style={{
+        aspectRatio: '4 / 3', borderRadius: 16, overflow: 'hidden',
+        background: camera.photo
+          ? 'linear-gradient(135deg, #FDEAD5, #FFE0CC)'
+          : camera.isActive
+            ? '#1A1410'
+            : 'repeating-linear-gradient(45deg, #FBF2E5, #FBF2E5 10px, #F4E5D0 10px, #F4E5D0 20px)',
+        border: '2px dashed var(--rule-2)', position: 'relative',
+        display: 'grid', placeItems: 'center',
+      }}>
+        {camera.photo ? (
+          <img src={camera.photo} alt="Your creation" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : camera.isActive ? (
+          <video
+            ref={camera.videoRef}
+            autoPlay playsInline muted
+            aria-label="Camera preview"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{ textAlign: 'center', color: 'var(--ink-3)' }}>
+            <div style={{ fontSize: 44 }}>&#x1F4F7;</div>
+            <div style={{ marginTop: 6, fontSize: 14 }}>Show Buddy what you want</div>
+          </div>
+        )}
       </div>
 
-      <div className="pick-switch-row">
-        <button className="pick-switch-btn" onClick={() => onSwitchMode('voice')} aria-label="Switch to Talk to Me">
-          &#x1F3A4; Talk to Me
-        </button>
-        <button className="pick-switch-btn" onClick={() => onSwitchMode('camera')} aria-label="Switch to Show Me">
-          &#x1F4F8; Show Me
-        </button>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {!camera.isActive && !camera.photo && (
+          <Btn variant="primary" onClick={camera.startCamera} icon="📷" disabled={camera.isStarting}>
+            {camera.isStarting ? 'Opening camera…' : 'Open Camera'}
+          </Btn>
+        )}
+        {camera.isActive && (
+          <Btn variant="brick" onClick={onTake} icon="📸">Capture</Btn>
+        )}
+        {camera.photo && (
+          <>
+            <Btn variant="outline" onClick={onRetake}>Retake</Btn>
+            <Btn variant="brick" onClick={onConfirm} disabled={generating}>
+              {generating ? 'Reading…' : 'Build this →'}
+            </Btn>
+          </>
+        )}
       </div>
-    </section>
+    </Card>
+  );
+}
+
+/* ───────── Preset card ───────── */
+function PresetCard({ model, picked, onPick }) {
+  return (
+    <button
+      onClick={onPick}
+      aria-pressed={picked}
+      style={{
+        padding: 18, borderRadius: 18,
+        background: picked ? 'rgba(225,79,59,0.08)' : 'var(--card)',
+        border: `1px solid ${picked ? 'var(--brick-red)' : 'var(--rule)'}`,
+        boxShadow: picked ? 'var(--shadow-2)' : 'var(--shadow-1)',
+        textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 8,
+        transition: 'transform 0.12s, box-shadow 0.2s',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-2)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = picked ? 'var(--shadow-2)' : 'var(--shadow-1)'; }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 42 }}>{model.emoji}</span>
+        <Chip bg={`${model.color || '#E14F3B'}22`} color={model.color || '#E14F3B'}>{model.difficulty || 'Easy'}</Chip>
+      </div>
+      <div className="serif" style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{model.name}</div>
+      <div style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <PieceDot color={model.color || '#E14F3B'} />
+        {model.pieceCount} pieces &middot; {model.steps.length} steps
+      </div>
+    </button>
   );
 }
