@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
+import { ProgressDots } from '../App';
 import { robotModels } from '../data/models';
 import { analyzePhoto } from '../services/imageAnalyzer';
 import { generateFullRobot, generateCustomRobot, customizeModel } from '../services/aiService';
@@ -209,7 +210,7 @@ export default function ImagineScreen() {
 
   return (
     <div className="bb-screen" role="main" aria-label="Choose how to start">
-      <TopBar onBack={handleBack} progressLabel="STAGE 1 · IMAGINE">
+      <TopBar onBack={handleBack} right={<ProgressDots />}>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <Chip bg="var(--live-soft)" color="var(--live)">
             <BuddyFace size={18} state="listening" />&nbsp;Buddy is ready

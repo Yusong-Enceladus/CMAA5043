@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useBuild } from '../context/BuildContext';
+import { ProgressDots } from '../App';
 import { steamFacts } from '../data/models';
 import { playClick, playSuccess } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
@@ -100,165 +101,170 @@ export default function LearnScreen() {
 
   return (
     <div className="bb-screen" role="main" aria-label="Learning stage">
-      <TopBar onBack={() => setStage('build')} progressLabel="STAGE 3 · LEARN">
+      <TopBar onBack={() => setStage('build')} right={<ProgressDots />}>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <Chip bg="var(--paper-2)" color="var(--ink-2)">&#x1F9E0; What you learned</Chip>
         </div>
       </TopBar>
 
       <div style={{
-        flex: 1, minHeight: 0, padding: '12px 16px 14px',
+        flex: 1, minHeight: 0, padding: '16px 24px 18px',
         background: 'radial-gradient(ellipse at 50% 0%, #FFE0CC 0%, #FFF6EC 60%)',
         overflow: 'hidden',
       }}>
         <div style={{
-          maxWidth: 1240, height: '100%', margin: '0 auto',
-          display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
-          gridTemplateRows: 'auto 1fr auto', gap: 12,
+          maxWidth: 1200, height: '100%', margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 0.9fr)',
+          gridTemplateRows: 'auto 1fr', gap: 16, alignItems: 'stretch',
         }}>
-          {/* Row 1: Hero title + stats (left) / 3D preview (right, spans rows 1-2) */}
-          <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
-            <Kicker>You built it.</Kicker>
-            <Display size="sm">{learning.title}</Display>
-            <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.45 }}>
-              Three big ideas your {selectedModel?.name || 'robot'} taught you.
-            </p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+          {/* Row 1 (spans): Hero title */}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+              <Kicker>You built it.</Kicker>
+              <Display size="sm">{learning.title}</Display>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
               <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">{totalSteam} STEAM</Chip>
               <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">{questionsAsked} questions</Chip>
               <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">{topicsExplored} topics</Chip>
+              <Btn variant="brick" size="sm" onClick={() => { if (soundEnabled) playSuccess(); setStage('celebrate'); }} icon="🎉">
+                Celebrate
+              </Btn>
             </div>
           </div>
-          <Card pad={0} style={{ gridRow: '1 / span 2', overflow: 'hidden', minHeight: 0 }}>
-            <LegoViewer3D
-              model={selectedModel}
-              currentStep={(selectedModel?.steps?.length || 1) - 1}
-              autoRotate
-              showControls={false}
-            />
-          </Card>
 
-          {/* Row 2 left: Highlights stacked compact */}
-          <div style={{ display: 'grid', gap: 8, gridAutoRows: 'min-content' }}>
-            {learning.rows.map((h, i) => (
-              <div key={i} style={{
-                background: 'var(--card)', border: '1px solid var(--rule)',
-                boxShadow: 'var(--shadow-1)', borderRadius: 14, padding: '10px 12px',
-                display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 10, alignItems: 'center',
+          {/* Row 2 left: 3D preview on top, highlights below */}
+          <div style={{ display: 'grid', gridTemplateRows: '1fr auto', gap: 12, minHeight: 0 }}>
+            <Card pad={0} style={{ overflow: 'hidden', minHeight: 0, position: 'relative' }}>
+              <LegoViewer3D
+                model={selectedModel}
+                currentStep={(selectedModel?.steps?.length || 1) - 1}
+                autoRotate
+                showControls={false}
+              />
+              <div style={{
+                position: 'absolute', top: 12, left: 12,
+                padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.85)',
+                fontSize: 11, fontWeight: 700, color: 'var(--ink-2)',
+                fontFamily: 'var(--mono)', letterSpacing: '0.08em',
               }}>
-                <div style={{ fontSize: 24 }}>{h.icon}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div className="serif" style={{ fontSize: 14, lineHeight: 1.2, fontWeight: 700 }}>{h.t}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.35 }}>{h.d}</div>
-                </div>
+                {selectedModel?.emoji} {selectedModel?.name?.toUpperCase()}
               </div>
-            ))}
+            </Card>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {learning.rows.map((h, i) => (
+                <div key={i} style={{
+                  background: 'var(--card)', border: '1px solid var(--rule)',
+                  boxShadow: 'var(--shadow-1)', borderRadius: 14, padding: '10px 12px',
+                  display: 'grid', gap: 4,
+                }}>
+                  <div style={{ fontSize: 22 }}>{h.icon}</div>
+                  <div className="serif" style={{ fontSize: 13, lineHeight: 1.2, fontWeight: 700 }}>{h.t}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.35 }}>{h.d}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Row 3: Dive deeper (left) + Quiz (right) */}
-          <Card pad={12} style={{ display: 'grid', gap: 8, minHeight: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Kicker>Dive deeper</Kicker>
-            </div>
-            <div role="tablist" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {TOPICS.map(t => (
-                <button
-                  key={t.key}
-                  role="tab"
-                  aria-selected={activeTopic === t.key}
-                  onClick={() => handleTopicChange(t.key)}
-                  style={{
-                    padding: '5px 9px', borderRadius: 999, fontWeight: 700, fontSize: 11,
-                    background: activeTopic === t.key ? 'var(--ink)' : 'rgba(26,20,16,0.06)',
-                    color: activeTopic === t.key ? '#FFF6EC' : 'var(--ink-2)',
-                    display: 'inline-flex', gap: 5, alignItems: 'center',
+          {/* Row 2 right: Dive deeper tabs + fact, then quiz */}
+          <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', gap: 12, minHeight: 0 }}>
+            <Card pad={14} style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Kicker>Dive deeper</Kicker>
+              </div>
+              <div role="tablist" style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {TOPICS.map(t => (
+                  <button
+                    key={t.key}
+                    role="tab"
+                    aria-selected={activeTopic === t.key}
+                    onClick={() => handleTopicChange(t.key)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 999, fontWeight: 700, fontSize: 12,
+                      background: activeTopic === t.key ? 'var(--ink)' : 'rgba(26,20,16,0.06)',
+                      color: activeTopic === t.key ? '#FFF6EC' : 'var(--ink-2)',
+                      display: 'inline-flex', gap: 6, alignItems: 'center',
+                    }}>
+                    {t.label}
+                    {steamProgress[t.key] > 0 && (
+                      <span style={{
+                        background: activeTopic === t.key ? 'rgba(255,246,236,0.2)' : 'var(--brick-red)',
+                        color: activeTopic === t.key ? '#FFF6EC' : '#FFF',
+                        padding: '0 6px', borderRadius: 999, fontSize: 10,
+                      }}>{steamProgress[t.key]}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div role="tabpanel">
+                {facts.slice(0, 1).map((f, i) => (
+                  <div key={i} style={{
+                    padding: 12, borderRadius: 12, background: 'var(--paper-2)',
+                    border: '1px solid var(--rule)',
                   }}>
-                  {t.label}
-                  {steamProgress[t.key] > 0 && (
-                    <span style={{
-                      background: activeTopic === t.key ? 'rgba(255,246,236,0.2)' : 'var(--brick-red)',
-                      color: activeTopic === t.key ? '#FFF6EC' : '#FFF',
-                      padding: '0 5px', borderRadius: 999, fontSize: 10,
-                    }}>{steamProgress[t.key]}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div role="tabpanel" style={{ display: 'grid', gap: 6, minHeight: 0, overflow: 'hidden' }}>
-              {facts.slice(0, 1).map((f, i) => (
-                <div key={i} style={{
-                  padding: 10, borderRadius: 10, background: 'var(--paper-2)',
-                  border: '1px solid var(--rule)',
-                }}>
-                  <div className="serif" style={{ fontSize: 13, lineHeight: 1.2, marginBottom: 4, fontWeight: 700 }}>{f.q}</div>
-                  <div
-                    style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--ink-2)' }}
-                    dangerouslySetInnerHTML={{ __html: f.a }}
-                  />
-                  {f.fact && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, fontWeight: 600 }}>
-                      &#x1F31F; {f.fact}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
+                    <div className="serif" style={{ fontSize: 14, lineHeight: 1.25, marginBottom: 5, fontWeight: 700 }}>{f.q}</div>
+                    <div
+                      style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink-2)' }}
+                      dangerouslySetInnerHTML={{ __html: f.a }}
+                    />
+                    {f.fact && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5, fontWeight: 600 }}>
+                        &#x1F31F; {f.fact}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-          <Card pad={12} style={{ display: 'grid', gap: 8, minHeight: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BuddyFace size={28} state="speaking" />
-              <div style={{ minWidth: 0 }}>
-                <Kicker color="var(--brick-red)">Quick quiz</Kicker>
-                <div className="serif" style={{ fontSize: 14, lineHeight: 1.15, fontWeight: 700 }}>Two questions. Ready?</div>
-              </div>
-              <div style={{ flex: 1 }} />
-              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                {done ? `${score}/${quiz.length}` : `${qi + 1}/${quiz.length}`}
-              </div>
-            </div>
-            {!done ? (
-              <div style={{ display: 'grid', gap: 6 }}>
-                <div className="serif" style={{ fontSize: 14, lineHeight: 1.2, fontWeight: 700 }}>{quiz[qi].q}</div>
-                <div style={{ display: 'grid', gap: 5 }}>
-                  {quiz[qi].options.map((o, i) => {
-                    const correct = picked !== null && i === quiz[qi].answer;
-                    const wrong   = picked !== null && i === picked && i !== quiz[qi].answer;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handlePick(i)}
-                        disabled={picked !== null}
-                        style={{
-                          padding: '8px 10px', borderRadius: 10, textAlign: 'left',
-                          background: correct ? 'rgba(15,153,104,0.12)' : wrong ? 'rgba(225,79,59,0.12)' : 'rgba(26,20,16,0.04)',
-                          border: `1.5px solid ${correct ? 'var(--ok)' : wrong ? 'var(--brick-red)' : 'transparent'}`,
-                          fontSize: 12.5, fontWeight: 600, color: 'var(--ink)',
-                          cursor: picked !== null ? 'default' : 'pointer',
-                        }}>
-                        {o}{correct && ' \u2713'}{wrong && ' \u2715'}
-                      </button>
-                    );
-                  })}
+            <Card pad={14} style={{ display: 'grid', gap: 10, minHeight: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <BuddyFace size={32} state="speaking" />
+                <div style={{ minWidth: 0 }}>
+                  <Kicker color="var(--brick-red)">Quick quiz</Kicker>
+                  <div className="serif" style={{ fontSize: 15, lineHeight: 1.15, fontWeight: 700 }}>Two questions. Ready?</div>
+                </div>
+                <div style={{ flex: 1 }} />
+                <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  {done ? `${score}/${quiz.length}` : `${qi + 1}/${quiz.length}`}
                 </div>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gap: 6, textAlign: 'center', padding: '6px 0' }}>
-                <div style={{ fontSize: 34, fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--brick-red)', lineHeight: 1 }}>
-                  {score}/{quiz.length}
+              {!done ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div className="serif" style={{ fontSize: 14, lineHeight: 1.25, fontWeight: 700 }}>{quiz[qi].q}</div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {quiz[qi].options.map((o, i) => {
+                      const correct = picked !== null && i === quiz[qi].answer;
+                      const wrong   = picked !== null && i === picked && i !== quiz[qi].answer;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handlePick(i)}
+                          disabled={picked !== null}
+                          style={{
+                            padding: '10px 12px', borderRadius: 12, textAlign: 'left',
+                            background: correct ? 'rgba(15,153,104,0.12)' : wrong ? 'rgba(225,79,59,0.12)' : 'rgba(26,20,16,0.04)',
+                            border: `1.5px solid ${correct ? 'var(--ok)' : wrong ? 'var(--brick-red)' : 'transparent'}`,
+                            fontSize: 13, fontWeight: 600, color: 'var(--ink)',
+                            cursor: picked !== null ? 'default' : 'pointer',
+                          }}>
+                          {o}{correct && ' \u2713'}{wrong && ' \u2715'}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
-                  {score === quiz.length ? 'Perfect! \u{1F31F}' : "Nice work! \u{1F4AA}"}
+              ) : (
+                <div style={{ display: 'grid', gap: 6, textAlign: 'center', padding: '10px 0' }}>
+                  <div style={{ fontSize: 40, fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--brick-red)', lineHeight: 1 }}>
+                    {score}/{quiz.length}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
+                    {score === quiz.length ? 'Perfect! \u{1F31F}' : "Nice work! \u{1F4AA}"}
+                  </div>
                 </div>
-              </div>
-            )}
-          </Card>
-
-          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
-            <Btn variant="brick" size="md" onClick={() => { if (soundEnabled) playSuccess(); setStage('celebrate'); }}
-              icon="🎉">
-              Celebrate your build
-            </Btn>
+              )}
+            </Card>
           </div>
         </div>
       </div>

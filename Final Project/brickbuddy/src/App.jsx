@@ -14,15 +14,15 @@ import LearnScreen from './components/LearnScreen';
 import CelebrateScreen from './components/CelebrateScreen';
 import './App.css';
 
-const STAGES = ['splash', 'imagine', 'build', 'learn', 'celebrate'];
+export const STAGES = ['splash', 'imagine', 'build', 'learn', 'celebrate'];
 
-function ProgressDots() {
+export function ProgressDots() {
   const { stage, setStage, selectedModel } = useBuild();
   if (stage === 'splash') return null;
   const idx = STAGES.indexOf(stage);
   return (
     <div style={{
-      position: 'fixed', top: 14, right: 16, zIndex: 100, display: 'flex', gap: 6,
+      display: 'inline-flex', gap: 6, alignItems: 'center',
       background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)',
       padding: '6px 10px', borderRadius: 99, boxShadow: 'var(--shadow-1)',
     }}>
@@ -67,12 +67,7 @@ function AppRouter() {
     case 'celebrate': screen = <CelebrateScreen />; break;
     default:          screen = <SplashScreen />;
   }
-  return (
-    <>
-      <ProgressDots />
-      {screen}
-    </>
-  );
+  return screen;
 }
 
 export default function App() {
