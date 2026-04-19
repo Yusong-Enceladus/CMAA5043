@@ -1,6 +1,77 @@
-/* BrickBuddy global reset */
+/* Global design tokens + base reset for BrickBuddy. */
 :root {
+  /* Warm, paper-and-brick palette anchored in the reference design. */
+  --ink:        #1A1410;
+  --ink-2:      #3A2C21;
+  --ink-3:      #6A5445;
+  --ink-4:      #A18E7E;
+  --paper:      #FFF6EC;
+  --paper-2:    #FDEAD5;
+  --paper-3:    #FFE0CC;
+  --card:       #FFFFFF;
+  --rule:       rgba(26, 20, 16, 0.08);
+  --rule-2:     rgba(26, 20, 16, 0.16);
+
+  /* Brick hues — pulled from the model data so 3D + UI stay in sync. */
+  --brick-red:    #E14F3B;
+  --brick-red-d:  #B2392A;
+  --brick-orange: #F59E0B;
+  --brick-yellow: #FBBF24;
+  --brick-green:  #10B981;
+  --brick-blue:   #3B82F6;
+  --brick-navy:   #1F2937;
+  --brick-gray:   #6B7280;
+
+  /* State colors — "listening" blue, "success" green, "warn" orange. */
+  --live:       #2F6FEB;
+  --live-soft:  #DCE7FB;
+  --ok:         #0F9968;
+  --warn:       #E0701B;
+  --violet:     #8357E6;
+
+  /* Type stack. */
+  --sans:  "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --serif: "Fraunces", ui-serif, Georgia, serif;
+  --mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* Radii + shadows. */
+  --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-2xl: 36px;
+  --shadow-1: 0 1px 2px rgba(26,20,16,0.06), 0 2px 8px rgba(26,20,16,0.04);
+  --shadow-2: 0 4px 14px rgba(26,20,16,0.08), 0 12px 30px rgba(26,20,16,0.06);
+  --shadow-3: 0 10px 40px rgba(26,20,16,0.14);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  font-feature-settings: "ss01", "cv11";
+  overscroll-behavior: none;
+}
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Utilities consumed by components. */
+.serif { font-family: var(--serif); font-weight: 700; letter-spacing: -0.02em; }
+.mono  { font-family: var(--mono); }
+button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; }
+button:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(26,20,16,0.16); border-radius: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes floatY   { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes pulseRing { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes blink    { 0%, 88%, 100% { transform: scaleY(1); } 92% { transform: scaleY(0.08); } }
+@keyframes voiceBar-0 { from { height: 6px;  } to { height: 26px; } }
+@keyframes voiceBar-1 { from { height: 10px; } to { height: 32px; } }
+@keyframes voiceBar-2 { from { height: 14px; } to { height: 22px; } }
+@keyframes voiceBar-3 { from { height: 8px;  } to { height: 18px; } }

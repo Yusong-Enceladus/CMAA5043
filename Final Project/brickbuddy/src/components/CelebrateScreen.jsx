@@ -1,11 +1,15 @@
 /**
- * CelebrateScreen — Completion celebration with confetti, achievements,
- * build time, personalized stats, and shareable certificate.
+ * CelebrateScreen — Redesigned finale. Confetti canvas, a big rotating 3D
+ * trophy viewer of the finished build, stats, achievements, and CTAs
+ * (download certificate + build something else). Certificate + achievement
+ * logic is preserved from the existing implementation.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { playCelebration } from '../services/soundEffects';
-import './CelebrateScreen.css';
+import LegoViewer3D from './LegoViewer3D';
+import { BuddyFace } from '../design/Buddy';
+import { Btn, Card, Chip, Display, Kicker, TopBar } from '../design/UI';
 
 function formatDuration(seconds) {
   if (seconds < 60) return `${seconds}s`;
@@ -14,186 +18,222 @@ function formatDuration(seconds) {
   return `${m}m ${s}s`;
 }
 
+function Confetti() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let w, h, dpr, raf;
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = canvas.clientWidth; h = canvas.clientHeight;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    const obs = new ResizeObserver(resize); obs.observe(canvas);
+    const colors = ['#E14F3B', '#F59E0B', '#FBBF24', '#10B981', '#3B82F6', '#8357E6'];
+    const pieces = Array.from({ length: 90 }, () => ({
+      x: Math.random() * w, y: -20 - Math.random() * h * 0.5,
+      vx: (Math.random() - 0.5) * 1.4, vy: 1 + Math.random() * 2,
+      a: Math.random() * Math.PI, va: (Math.random() - 0.5) * 0.12,
+      size: 6 + Math.random() * 8,
+      c: colors[(Math.random() * colors.length) | 0],
+      shape: Math.random() < 0.5 ? 'rect' : 'circ',
+    }));
+    const tick = () => {
+      ctx.clearRect(0, 0, w, h);
+      for (const p of pieces) {
+        p.x += p.vx; p.y += p.vy; p.a += p.va;
+        if (p.y > h + 20) { p.y = -20; p.x = Math.random() * w; }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.fillStyle = p.c;
+        if (p.shape === 'rect') ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        else { ctx.beginPath(); ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2); ctx.fill(); }
+        ctx.restore();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => { cancelAnimationFrame(raf); obs.disconnect(); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />;
+}
+
 export default function CelebrateScreen() {
   const {
     selectedModel, steamProgress, achievements, buildDuration,
-    chatHistory, resetSession, soundEnabled,
+    chatHistory, resetSession, setStage, soundEnabled,
   } = useBuild();
-  const certificateRef = useRef(null);
+  const [saved, setSaved] = useState(false);
 
-  // Launch confetti + fanfare on mount
   useEffect(() => {
     if (soundEnabled) playCelebration();
-
-    const container = document.getElementById('confetti');
-    if (!container) return;
-    const colors = ['#FF6B35', '#4ECDC4', '#FFE66D', '#A855F7', '#F472B6', '#60A5FA', '#34D399'];
-    for (let i = 0; i < 80; i++) {
-      const el = document.createElement('div');
-      el.className = 'confetti-piece';
-      el.style.left = `${Math.random() * 100}%`;
-      el.style.background = colors[Math.floor(Math.random() * colors.length)];
-      el.style.width = `${6 + Math.random() * 10}px`;
-      el.style.height = `${6 + Math.random() * 10}px`;
-      el.style.animationDuration = `${2 + Math.random() * 3}s`;
-      el.style.animationDelay = `${Math.random() * 2}s`;
-      el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-      container.appendChild(el);
-    }
-    return () => { container.innerHTML = ''; };
   }, [soundEnabled]);
 
+  const stepCount = selectedModel?.steps?.length || 0;
+  const brickCount = (selectedModel?.steps || []).reduce((n, s) => n + (s.newParts?.length || s.bricks?.length || 0), 0);
+  const minutes = buildDuration > 0 ? formatDuration(buildDuration) : '—';
   const totalSteam = Object.values(steamProgress).reduce((a, b) => a + b, 0);
   const topicsExplored = Object.values(steamProgress).filter(v => v > 0).length;
   const questionsAsked = chatHistory.filter(m => m.role === 'child').length;
 
-  // Generate a shareable certificate as canvas image
   const handleDownloadCertificate = () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 500;
+    canvas.width = 800; canvas.height = 500;
     const ctx = canvas.getContext('2d');
 
-    // Background gradient
     const grad = ctx.createLinearGradient(0, 0, 800, 500);
-    grad.addColorStop(0, '#FFF5EE');
-    grad.addColorStop(1, '#FFE8D6');
+    grad.addColorStop(0, '#FFF6EC');
+    grad.addColorStop(1, '#FFE0CC');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 800, 500);
 
-    // Border
-    ctx.strokeStyle = '#FF6B35';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(20, 20, 760, 460);
-    ctx.strokeStyle = '#4ECDC4';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(30, 30, 740, 440);
+    ctx.strokeStyle = '#E14F3B'; ctx.lineWidth = 6; ctx.strokeRect(20, 20, 760, 460);
+    ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 2; ctx.strokeRect(30, 30, 740, 440);
 
-    // Title
-    ctx.fillStyle = '#FF6B35';
-    ctx.font = 'bold 36px Fredoka, sans-serif';
+    ctx.fillStyle = '#1A1410';
+    ctx.font = 'bold 36px "Fraunces", serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Certificate of Achievement', 400, 80);
+    ctx.fillText('Certificate of Achievement', 400, 90);
 
-    // Subtitle
-    ctx.fillStyle = '#666';
-    ctx.font = '18px Nunito, sans-serif';
-    ctx.fillText('BrickBuddy STEAM Building Challenge', 400, 115);
+    ctx.fillStyle = '#6A5445';
+    ctx.font = '18px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('BrickBuddy STEAM Building Challenge', 400, 120);
 
-    // Trophy
     ctx.font = '60px serif';
-    ctx.fillText('\u{1F3C6}', 400, 185);
+    ctx.fillText('\u{1F3C6}', 400, 200);
 
-    // Model info
-    ctx.fillStyle = '#2D3436';
-    ctx.font = 'bold 24px Nunito, sans-serif';
-    ctx.fillText(`Successfully built: ${selectedModel?.name || 'Robot'}`, 400, 240);
+    ctx.fillStyle = '#1A1410';
+    ctx.font = 'bold 24px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText(`Successfully built: ${selectedModel?.name || 'Robot'}`, 400, 250);
 
-    // Stats
-    ctx.font = '16px Nunito, sans-serif';
-    ctx.fillStyle = '#555';
-    ctx.fillText(`${selectedModel?.pieceCount || 0} pieces \u2022 ${selectedModel?.steps.length || 0} steps \u2022 ${topicsExplored} STEAM topics`, 400, 275);
-    if (buildDuration > 0) {
-      ctx.fillText(`Build time: ${formatDuration(buildDuration)}`, 400, 300);
-    }
+    ctx.fillStyle = '#3A2C21';
+    ctx.font = '16px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText(`${brickCount} pieces \u2022 ${stepCount} steps \u2022 ${topicsExplored} STEAM topics`, 400, 285);
+    if (buildDuration > 0) ctx.fillText(`Build time: ${formatDuration(buildDuration)}`, 400, 310);
 
-    // Achievements
     if (achievements.length > 0) {
-      ctx.fillStyle = '#FF6B35';
-      ctx.font = 'bold 16px Nunito, sans-serif';
-      ctx.fillText('Achievements:', 400, 340);
-      ctx.font = '14px Nunito, sans-serif';
-      ctx.fillStyle = '#555';
+      ctx.fillStyle = '#E14F3B';
+      ctx.font = 'bold 16px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Achievements:', 400, 350);
+      ctx.font = '14px "Plus Jakarta Sans", sans-serif';
+      ctx.fillStyle = '#3A2C21';
       const achText = achievements.map(a => `${a.icon} ${a.label}`).join('  \u2022  ');
-      ctx.fillText(achText, 400, 365);
+      ctx.fillText(achText, 400, 375);
     }
 
-    // Footer
-    ctx.fillStyle = '#aaa';
-    ctx.font = '12px Nunito, sans-serif';
+    ctx.fillStyle = '#A18E7E';
+    ctx.font = '12px "Plus Jakarta Sans", sans-serif';
     ctx.fillText('Powered by BrickBuddy \u2022 CMAA5043 Final Project \u2022 Yusong & Jiayi', 400, 450);
     ctx.fillText(new Date().toLocaleDateString(), 400, 470);
 
-    // Download
     const link = document.createElement('a');
     link.download = `BrickBuddy-${selectedModel?.name || 'Robot'}-Certificate.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+    setSaved(true);
   };
 
   return (
-    <div className="celebrate-screen" role="main" aria-label="Celebration">
-      <div id="confetti" className="confetti-container" aria-hidden="true" />
-
-      <div className="trophy" aria-hidden="true">&#x1F3C6;</div>
-      <h1>You Did It!</h1>
-      <p className="celebrate-msg">
-        You built an amazing <strong>{selectedModel?.name || 'Robot'}</strong> {selectedModel?.emoji} and learned
-        so much about science, engineering, and more!
-      </p>
-
-      {/* Stats row */}
-      <div className="stats-row" role="group" aria-label="Build statistics">
-        <div className="stat-card">
-          <div className="stat-num">{selectedModel?.pieceCount || 0}</div>
-          <div className="stat-label">Pieces Used</div>
+    <div className="bb-screen" style={{ position: 'relative' }}>
+      <Confetti />
+      <TopBar onBack={() => setStage('learn')} progressLabel="STAGE 4 · DONE!">
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <Chip bg="var(--brick-red)" color="#fff">&#x1F3C6; YOU BUILT IT</Chip>
         </div>
-        <div className="stat-card">
-          <div className="stat-num">{selectedModel?.steps.length || 0}</div>
-          <div className="stat-label">Steps Done</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-num">{totalSteam}</div>
-          <div className="stat-label">Things Learned</div>
-        </div>
-        {buildDuration > 0 && (
-          <div className="stat-card">
-            <div className="stat-num">{formatDuration(buildDuration)}</div>
-            <div className="stat-label">Build Time</div>
-          </div>
-        )}
-      </div>
+      </TopBar>
 
-      {/* Achievements */}
-      {achievements.length > 0 && (
-        <section className="achievements-section" aria-label="Achievements earned">
-          <h2 className="achievements-title">&#x1F31F; Achievements Unlocked</h2>
-          <div className="achievements-grid">
-            {achievements.map(a => (
-              <div key={a.id} className="achievement-card">
-                <div className="achievement-icon">{a.icon}</div>
-                <div className="achievement-label">{a.label}</div>
-                <div className="achievement-desc">{a.desc}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* STEAM breakdown */}
-      {topicsExplored > 0 && (
-        <div className="steam-breakdown" aria-label="STEAM topics explored">
-          {Object.entries(steamProgress).map(([key, val]) => val > 0 && (
-            <div key={key} className={`steam-pill ${key}`}>
-              {key === 'science' && '\u{1F52C}'}
-              {key === 'technology' && '\u{1F4BB}'}
-              {key === 'engineering' && '\u2699\uFE0F'}
-              {key === 'art' && '\u{1F3A8}'}
-              {key === 'math' && '\u{1F522}'}
-              {' '}{key} &times;{val}
+      <div style={{ flex: 1, padding: '28px 20px 48px', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gap: 24 }}>
+          <div style={{ textAlign: 'center', display: 'grid', gap: 8, padding: '8px 0 4px' }}>
+            <Kicker color="var(--brick-red)">High five!</Kicker>
+            <Display size="lg" style={{ textWrap: 'balance' }}>
+              You built a {selectedModel?.name || 'robot'}.
+            </Display>
+            <div style={{ fontSize: 18, color: 'var(--ink-3)' }}>
+              {stepCount} steps &middot; {brickCount} bricks &middot; {minutes !== '—' ? `~${minutes} of pure genius.` : 'pure genius.'}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
 
-      {/* Actions */}
-      <div className="celebrate-actions">
-        <button className="certificate-btn" onClick={handleDownloadCertificate} aria-label="Download your certificate">
-          &#x1F4DC; Download Certificate
-        </button>
-        <button className="restart-btn" onClick={resetSession} aria-label="Build another robot">
-          Build Again! &#x1F504;
-        </button>
+          <Card pad={0} style={{ aspectRatio: '16/9', overflow: 'hidden', position: 'relative' }}>
+            <LegoViewer3D model={selectedModel} currentStep={Math.max(0, stepCount - 1)} autoRotate showControls={false} />
+            <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div style={{ display: 'grid', gap: 4 }}>
+                <div style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Your build</div>
+                <div className="serif" style={{ fontSize: 26, color: 'var(--ink)' }}>{selectedModel?.name}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['#E14F3B', '#F59E0B', '#10B981', '#3B82F6', '#8357E6'].map(c =>
+                  <div key={c} style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
+            <Card pad={22} style={{ display: 'grid', gap: 14 }}>
+              <Kicker>Build report</Kicker>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {[
+                  { k: stepCount,       l: 'steps',       c: 'var(--brick-blue)' },
+                  { k: brickCount,      l: 'bricks',      c: 'var(--brick-red)' },
+                  { k: minutes,         l: 'build time',  c: 'var(--brick-green)' },
+                ].map(s => (
+                  <div key={s.l} style={{ padding: 14, borderRadius: 14, background: 'rgba(26,20,16,0.04)', textAlign: 'center' }}>
+                    <div className="serif" style={{ fontSize: 34, color: s.c, lineHeight: 1 }}>{s.k}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">&#x2605; {totalSteam} STEAM moments</Chip>
+                <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">&#x2605; {questionsAsked} questions</Chip>
+                <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">&#x2605; {topicsExplored} topics</Chip>
+              </div>
+
+              {achievements.length > 0 && (
+                <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+                  <Kicker color="var(--ink-3)">Achievements</Kicker>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {achievements.map(a => (
+                      <div key={a.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 8,
+                        padding: '6px 12px', borderRadius: 999, background: 'var(--paper-2)',
+                        fontSize: 12, fontWeight: 700, color: 'var(--ink-2)',
+                      }}>
+                        <span>{a.icon}</span>{a.label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            <Card pad={22} style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <BuddyFace size={56} state="celebrating" />
+                <div>
+                  <Kicker color="var(--brick-red)">Buddy says</Kicker>
+                  <div className="serif" style={{ fontSize: 19, lineHeight: 1.2, textWrap: 'balance' }}>
+                    That was AWESOME. Want to show someone?
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <Btn variant="ghost" icon="📜" onClick={handleDownloadCertificate}>
+                  {saved ? 'Certificate saved ✓' : 'Download certificate'}
+                </Btn>
+                <Btn variant="ghost" icon="🧑‍🎓">Show a grown-up</Btn>
+                <Btn variant="ghost" icon="🖨️" onClick={() => window.print()}>Print the instructions</Btn>
+              </div>
+            </Card>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Btn variant="ghost" size="lg" icon="🏠" onClick={() => setStage('splash')}>Back to start</Btn>
+            <Btn variant="brick" size="lg" icon="✨" onClick={resetSession}>Build something else</Btn>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -5,13 +5,19 @@
  * 0..currentStep. Newly-added parts at the current step pulse with an emissive
  * highlight so kids see what they just built.
  *
+ * Extensions for the redesign:
+ *  - `annotations` prop — coloured rings that pulse around highlighted parts.
+ *    Shape: [{ pos:[x,y,z], color?:number|string, r?:number }].
+ *  - Overlay +/-/reset zoom buttons in the bottom-right corner.
+ *  - Swappable background style: 'paper' | 'blueprint' | 'studio'.
+ *
  * Part schema (all types):
  *   { type, pos:[x,y,z], size:[w,h,d], color, opacity?, rotation?:[rx,ry,rz] }
  * - pos is the CENTER of the part.
  * - size is the AXIS-ALIGNED bounding box BEFORE rotation.
  * - rotation is applied AROUND the center; geometry must be centered on its local origin.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, RoundedBox, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -42,7 +48,6 @@ function PulseGroup({ isNew, color, children }) {
 /* ── Parts ──────────────────────────────────────────────────────── */
 
 function Studs({ w, d, color, yTop }) {
-  // Cap stud count so very large plates stay cheap.
   const wStuds = Math.max(1, Math.min(6, Math.round(w)));
   const dStuds = Math.max(1, Math.min(12, Math.round(d)));
   const positions = useMemo(() => {
@@ -124,39 +129,25 @@ function Cone({ part }) {
 }
 
 /**
- * Slope — a right-triangular prism centered on its local origin, with the peak
- * edge along the -Z face (the "front" of the slope). Before the user's part
- * rotation is applied, the local bounding box is:
- *   X ∈ [-w/2, w/2]  (width)
- *   Y ∈ [-h/2, h/2]  (height)
- *   Z ∈ [-d/2, d/2]  (depth, peak at Z=-d/2, base at Z=+d/2)
+ * Slope — a right-triangular prism centered on its local origin.
  */
 function Slope({ part }) {
   const [w, h, d] = part.size;
   const op = part.opacity ?? 1;
   const geo = useMemo(() => {
-    // 6 vertices of the triangular prism
     const positions = new Float32Array([
-      // Left end (X = -w/2)
-      -w / 2, -h / 2, -d / 2, // 0: bottom-front
-      -w / 2, -h / 2,  d / 2, // 1: bottom-back
-      -w / 2,  h / 2, -d / 2, // 2: top-front (peak)
-      // Right end (X = +w/2)
-       w / 2, -h / 2, -d / 2, // 3: bottom-front
-       w / 2, -h / 2,  d / 2, // 4: bottom-back
-       w / 2,  h / 2, -d / 2, // 5: top-front (peak)
+      -w / 2, -h / 2, -d / 2,
+      -w / 2, -h / 2,  d / 2,
+      -w / 2,  h / 2, -d / 2,
+       w / 2, -h / 2, -d / 2,
+       w / 2, -h / 2,  d / 2,
+       w / 2,  h / 2, -d / 2,
     ]);
-    // Faces — counterclockwise when viewed from OUTSIDE (normal points away).
     const indices = new Uint16Array([
-      // Left triangle (normal -X): order so that 0→2→1 is CCW from -X viewer
       0, 2, 1,
-      // Right triangle (normal +X): 3→4→5 CCW from +X viewer
       3, 4, 5,
-      // Bottom (normal -Y): 0→1→4, 0→4→3  (CCW from below)
       0, 1, 4,  0, 4, 3,
-      // Front (normal -Z): 0→3→5, 0→5→2 (CCW from -Z viewer)
       0, 3, 5,  0, 5, 2,
-      // Slanted top (normal roughly +Y+Z): 2→5→4, 2→4→1 (CCW from above/behind)
       2, 5, 4,  2, 4, 1,
     ]);
     const g = new THREE.BufferGeometry();
@@ -238,9 +229,26 @@ function Part({ part, isNew }) {
   );
 }
 
+/* ── Annotations ────────────────────────────────────────────────── */
+
+function AnnotationRing({ pos, color, r = 1.2 }) {
+  const ref = useRef();
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const sc = 1 + 0.15 * Math.sin(clock.getElapsedTime() * 3);
+    ref.current.scale.setScalar(sc);
+  });
+  return (
+    <mesh ref={ref} position={pos} rotation={[Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[r, 0.08, 10, 32]} />
+      <meshBasicMaterial color={color} transparent opacity={0.85} />
+    </mesh>
+  );
+}
+
 /* ── Scene ──────────────────────────────────────────────────────── */
 
-function Scene({ model, currentStep }) {
+function Scene({ model, currentStep, annotations }) {
   const { parts, newIds } = useMemo(() => {
     const acc = [];
     const newSet = new Set();
@@ -271,39 +279,88 @@ function Scene({ model, currentStep }) {
       {parts.map((p) => (
         <Part key={p._id} part={p} isNew={newIds.has(p._id)} />
       ))}
+      {(annotations || []).map((a, i) => (
+        <AnnotationRing
+          key={i}
+          pos={a.pos}
+          color={typeof a.color === 'number'
+            ? '#' + a.color.toString(16).padStart(6, '0')
+            : (a.color || '#2F6FEB')}
+          r={a.r || 1.2}
+        />
+      ))}
     </group>
   );
 }
 
 /* ── Main export ────────────────────────────────────────────────── */
 
-export default function LegoViewer3D({ model, modelId, currentStep }) {
-  // Prefer the live `model` prop so custom/recolored models render.
-  // Fall back to looking up a preset by id if only `modelId` was passed.
+const BG_STYLES = {
+  paper:     'linear-gradient(180deg, #FFF6EC 0%, #FFE0CC 55%, #FFD4BA 100%)',
+  blueprint: 'radial-gradient(circle at 30% 20%, #2C5282 0%, #1A365D 70%, #0F1E3A 100%)',
+  studio:    'linear-gradient(180deg, #FFFFFF 0%, #F3F0EA 100%)',
+};
+
+export default function LegoViewer3D({
+  model, modelId, currentStep,
+  annotations,
+  autoRotate = true,
+  backgroundStyle = 'paper',
+  showControls = true,
+}) {
   const resolvedModel = useMemo(() => {
     if (model) return model;
     if (!modelId) return null;
     return robotModels.find((m) => m.id === modelId) || null;
   }, [model, modelId]);
 
+  const controlsRef = useRef(null);
+  const [dist, setDist] = useState(14);
+
+  const applyDistance = useCallback((next) => {
+    const clamped = Math.max(6, Math.min(36, next));
+    setDist(clamped);
+    const c = controlsRef.current;
+    if (c) {
+      const cam = c.object;
+      const dir = new THREE.Vector3().subVectors(cam.position, c.target).normalize();
+      cam.position.copy(c.target).add(dir.multiplyScalar(clamped));
+      c.update();
+    }
+  }, []);
+
+  const zoomIn  = useCallback(() => applyDistance(dist - 2), [dist, applyDistance]);
+  const zoomOut = useCallback(() => applyDistance(dist + 2), [dist, applyDistance]);
+  const reset   = useCallback(() => {
+    applyDistance(14);
+    const c = controlsRef.current;
+    if (c) {
+      c.object.position.set(10, 7, 12);
+      c.target.set(0, 1.5, 0);
+      c.update();
+    }
+  }, [applyDistance]);
+
+  const btn = {
+    width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.92)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)', fontSize: 16, color: '#1A1410',
+    display: 'grid', placeItems: 'center', cursor: 'pointer', border: 'none',
+  };
+
   return (
     <div
       style={{
-        width: '100%',
-        height: '100%',
-        minHeight: 260,
-        borderRadius: 16,
-        overflow: 'hidden',
+        width: '100%', height: '100%', minHeight: 260,
+        borderRadius: 'inherit', overflow: 'hidden', position: 'relative',
+        background: BG_STYLES[backgroundStyle] || BG_STYLES.paper,
       }}
     >
       <Canvas
         shadows
         dpr={[1, 2]}
         camera={{ position: [10, 7, 12], fov: 32 }}
-        gl={{ antialias: true }}
-        style={{
-          background: 'linear-gradient(180deg, #FFF6EC 0%, #FFE0CC 55%, #FFD4BA 100%)',
-        }}
+        gl={{ antialias: true, alpha: true }}
+        style={{ background: 'transparent' }}
       >
         <directionalLight
           position={[7, 12, 6]}
@@ -321,7 +378,7 @@ export default function LegoViewer3D({ model, modelId, currentStep }) {
         <directionalLight position={[0, 2, -10]} intensity={0.35} color="#FDBA74" />
         <ambientLight intensity={0.55} />
 
-        <Scene model={resolvedModel} currentStep={currentStep} />
+        <Scene model={resolvedModel} currentStep={currentStep} annotations={annotations} />
 
         <ContactShadows
           position={[0, -0.1, 0]}
@@ -334,16 +391,25 @@ export default function LegoViewer3D({ model, modelId, currentStep }) {
         />
 
         <OrbitControls
+          ref={controlsRef}
           enablePan={false}
-          minDistance={7}
-          maxDistance={22}
+          minDistance={6}
+          maxDistance={36}
           minPolarAngle={0.25}
           maxPolarAngle={Math.PI / 2.1}
-          autoRotate
+          autoRotate={autoRotate}
           autoRotateSpeed={0.9}
           target={[0, 1.5, 0]}
         />
       </Canvas>
+
+      {showControls && (
+        <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'grid', gap: 6, zIndex: 5 }}>
+          <button style={btn} title="Zoom in"     onClick={zoomIn}  aria-label="Zoom in">+</button>
+          <button style={btn} title="Zoom out"    onClick={zoomOut} aria-label="Zoom out">−</button>
+          <button style={btn} title="Reset view"  onClick={reset}   aria-label="Reset view">⟲</button>
+        </div>
+      )}
     </div>
   );
 }
