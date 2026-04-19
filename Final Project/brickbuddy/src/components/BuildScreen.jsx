@@ -11,14 +11,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
 import { getSmartAIResponse, getStepWelcome, hasAIKey } from '../services/chatEngine';
 import { regenerateStep } from '../services/aiService';
-import { detectModIntent, recolorFromText } from '../services/localRobotGen';
+import {
+  detectModIntent, recolorFromText, applyChatModification, generateLocally,
+} from '../services/localRobotGen';
 import { playClick, playStepComplete, playChatReceive } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
 import './BuildScreen.css';
 
 export default function BuildScreen() {
   const {
-    selectedModel, currentStep, nextStep, prevStep, setStage,
+    selectedModel, currentStep, setCurrentStep, nextStep, prevStep, setStage,
     chatHistory, addChat, progress, soundEnabled,
     setSelectedModel, updateSelectedModel,
   } = useBuild();
@@ -88,6 +90,40 @@ export default function BuildScreen() {
         // If we couldn't find colors, fall through to normal chat.
       }
 
+      if (
+        intent?.kind === 'scale' ||
+        intent?.kind === 'add-feature' ||
+        intent?.kind === 'remove-feature'
+      ) {
+        const result = applyChatModification(selectedModel, text);
+        if (result) {
+          setSelectedModel(result.model);
+          if (soundEnabled) playStepComplete();
+          const tag = result.kind === 'scale' ? 'math' : 'engineering';
+          addChat(
+            'buddy',
+            `${result.changed}. Your ${selectedModel.name} just changed shape — pop into the 3D view to see it!`,
+            tag,
+          );
+          return;
+        }
+        // Fall through if no change was actually applied.
+      }
+
+      if (intent?.kind === 'rebuild') {
+        const fresh = generateLocally(text);
+        // Preserve the user's preferred name unless the new prompt clearly named something else.
+        setSelectedModel(fresh);
+        setCurrentStep(0);
+        if (soundEnabled) playStepComplete();
+        addChat(
+          'buddy',
+          `Rebuilt your robot from scratch as a ${fresh.name} ${fresh.emoji} — ${fresh.steps.length} steps, ${fresh.pieceCount} pieces. Let\u2019s build it!`,
+          'engineering',
+        );
+        return;
+      }
+
       if (intent?.kind === 'regen-step') {
         addChat('buddy', `Rebuilding step ${intent.stepIndex + 1} with a fresh idea\u2026`, null);
         try {
@@ -100,10 +136,14 @@ export default function BuildScreen() {
           if (soundEnabled) playStepComplete();
           addChat('buddy', `Done! Step ${intent.stepIndex + 1} got a makeover. Check the 3D view!`, 'engineering');
         } catch {
+          // AI step regen failed — fall back to procedurally swapping the step's
+          // bricks for a small variation so the user sees SOMETHING change.
+          updateSelectedModel((m) => proceduralStepShuffle(m, intent.stepIndex));
+          if (soundEnabled) playStepComplete();
           addChat(
             'buddy',
-            `I couldn\u2019t reshape step ${intent.stepIndex + 1} just now. Try a simpler request like "make it blue" instead!`,
-            null,
+            `Reshaped step ${intent.stepIndex + 1} locally — the AI was busy, so I swapped the bricks myself.`,
+            'engineering',
           );
         }
         return;
@@ -117,6 +157,33 @@ export default function BuildScreen() {
       setIsTyping(false);
     }
   };
+
+  // Local fallback for "redo step N" when the AI is unavailable: nudge each
+  // brick in that step a little and rotate its color — enough that the
+  // 3D view's "newly placed" pulse highlights something visibly different.
+  function proceduralStepShuffle(model, stepIndex) {
+    const copy = structuredClone(model);
+    const step = copy.steps[stepIndex];
+    if (!step?.newParts?.length) return copy;
+    const palette = collectPalette(copy.steps);
+    step.newParts = step.newParts.map((p, i) => {
+      const jitter = ((i % 3) - 1) * 0.4;
+      const next = palette[(palette.indexOf(p.color) + 1 + i) % palette.length] || p.color;
+      return {
+        ...p,
+        pos:  [p.pos[0] + jitter, p.pos[1], p.pos[2] - jitter],
+        size: [p.size[0] * 1.08, p.size[1], p.size[2] * 1.08],
+        color: next,
+      };
+    });
+    return copy;
+  }
+
+  function collectPalette(steps) {
+    const seen = new Set();
+    for (const s of steps) for (const p of s.newParts || []) seen.add(p.color);
+    return Array.from(seen);
+  }
 
   const handleNext = () => {
     if (soundEnabled) playStepComplete();
