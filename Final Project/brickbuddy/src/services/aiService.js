@@ -46,6 +46,25 @@ function parseSteamTag(text) {
 
 import { resolveSteps, validateBlueprint, derivePiecesFromBricks } from './brickResolver';
 
+/**
+ * Best-effort repair of LLM-emitted JSON. Handles trailing commas,
+ * single-quoted strings, JS-style line comments, and unquoted keys —
+ * the four mistakes that account for nearly every parse failure we see
+ * from free models. Returns the original string unchanged if no obvious
+ * problems are spotted (so we never *introduce* a parse error).
+ */
+function repairJSON(text) {
+  let out = text;
+  // Strip // line comments and /* block */ comments
+  out = out.replace(/\/\/[^\n\r]*/g, '');
+  out = out.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Trailing commas before ] or }
+  out = out.replace(/,(\s*[\]}])/g, '$1');
+  // "Smart" quotes → straight quotes
+  out = out.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  return out;
+}
+
 /* ─────────── Full-geometry generation (primary path) ──────────── */
 
 const BLUEPRINT_SYSTEM_PROMPT = `You are an architect designing LEGO robot blueprints for children aged 6-8.
@@ -135,8 +154,15 @@ export async function generateFullRobot(description) {
   let bp;
   try {
     bp = JSON.parse(match[0]);
-  } catch (e) {
-    throw new Error(`JSON parse failed: ${e.message}`);
+  } catch {
+    // Try repairing common LLM mistakes (trailing commas, "smart" quotes,
+    // // line comments) before giving up. Free models in particular often
+    // emit malformed JSON when token budget runs out mid-array.
+    try {
+      bp = JSON.parse(repairJSON(match[0]));
+    } catch (e2) {
+      throw new Error(`JSON parse failed: ${e2.message}`);
+    }
   }
 
   validateBlueprint(bp);

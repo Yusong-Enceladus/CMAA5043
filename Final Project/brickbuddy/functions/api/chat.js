@@ -13,10 +13,17 @@
 
 /**
  * Chat chain — ordered for KID-FACING quality, not raw intelligence.
- * Nemotron 3 Super is the smartest free model but leaks chain-of-thought
- * as plain text (no <think> tags) even with "respond only" instructions,
- * which is unusable for 6-8yo chat. Gemma 4 + Llama 3.3 follow tone
- * constraints reliably.
+ *
+ * Free-tier only. The OpenRouter $10 credit is used here as a quota multiplier
+ * (uncredited accounts: 50 req/day across all `:free` models; credited
+ * accounts: 1000 req/day) — NOT as a paid-inference budget. The `:free`
+ * suffix on every entry pins the call to the free pool so the credit is
+ * never billed against. Order is by intelligence/tone-fit, NOT by raw
+ * benchmark score, since 6-8yo chat penalises models that leak reasoning
+ * or write at adult reading level.
+ *
+ * Nemotron 3 Super is intentionally omitted — it leaks plain-text reasoning
+ * ("Okay, the user is asking...") which is unusable for 6-8yo chat.
  */
 const DEFAULT_MODELS = [
   'google/gemma-4-31b-it:free',               // warm, family-safe, reliable tone
@@ -28,7 +35,6 @@ const DEFAULT_MODELS = [
                                               //   stays up when the frontier free models
                                               //   are globally 429/503; better than a
                                               //   "server unavailable" error for kids.
-  // Nemotron 3 Super intentionally omitted — leaks plain-text reasoning.
 ];
 
 // JSON-generation chain — same principle. Models that follow "JSON only"
@@ -46,11 +52,16 @@ const JSON_MODELS = [
 const MAX_MESSAGES = 12;
 const MAX_TOTAL_CHARS = 8000;
 const MAX_TOKENS_CHAT = 220;
-const MAX_TOKENS_JSON = 450;              // extra budget for larger structured output
+// JSON budget needs to fit a full blueprint: 5-7 steps × 3-5 bricks × ~110
+// chars/brick + step metadata. 450 was too small — Claude's blueprints kept
+// truncating mid-brick, throwing JSON parse errors and falling all the way
+// through to the local generator (which is what made the credit "feel" unused).
+const MAX_TOKENS_JSON = 2500;
 const PER_ATTEMPT_TIMEOUT_MS_CHAT = 10000; // short — falls through fast if throttled
-const PER_ATTEMPT_TIMEOUT_MS_JSON = 22000; // longer — JSON payloads take longer to generate
-                                           //   and free models are slow under load
-const RETRIABLE = new Set([429, 500, 502, 503, 504]);
+const PER_ATTEMPT_TIMEOUT_MS_JSON = 30000; // longer — JSON payloads take longer to generate
+// 402 = OpenRouter "insufficient credit" → skip to the next model in the
+// chain (usually a `:free` one) instead of failing the whole request.
+const RETRIABLE = new Set([402, 404, 408, 425, 429, 500, 502, 503, 504]);
 
 const json = (body, init = {}) =>
   new Response(JSON.stringify(body), {
@@ -77,10 +88,28 @@ function validate(body) {
   return null;
 }
 
-async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTokens, timeoutMs) {
+async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTokens, timeoutMs, jsonMode = false) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const payload = {
+      model: modelId,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      // Ask OpenRouter to hide reasoning tokens from reasoning-capable
+      // models. Only takes effect when a model exposes reasoning as a
+      // separate field — models that inline CoT in `content` need the
+      // `stripThinking` pass below.
+      reasoning: { exclude: true },
+    };
+    if (jsonMode) {
+      // OpenAI-compatible structured-output hint. Supported by most paid
+      // models (Claude, GPT-4o, Gemini) and silently ignored by older free
+      // models. Still ask for plain JSON in the system prompt so all models
+      // — supported or not — get the message.
+      payload.response_format = { type: 'json_object' };
+    }
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -89,17 +118,7 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTok
         'HTTP-Referer': siteUrl,
         'X-Title': 'BrickBuddy',
       },
-      body: JSON.stringify({
-        model: modelId,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        // Ask OpenRouter to hide reasoning tokens from reasoning-capable
-        // models. Only takes effect when a model exposes reasoning as a
-        // separate field — models that inline CoT in `content` need the
-        // `stripThinking` pass below.
-        reasoning: { exclude: true },
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -205,7 +224,7 @@ export async function onRequestPost({ request, env }) {
   let lastErr;
   for (const modelId of models) {
     try {
-      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl, maxTokens, perAttemptMs);
+      const content = await callModel(modelId, body.messages, env.OPENROUTER_API_KEY, temperature, siteUrl, maxTokens, perAttemptMs, jsonMode);
       return json({ text: content, model: modelId });
     } catch (err) {
       lastErr = err;

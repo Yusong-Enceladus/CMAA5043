@@ -10,7 +10,10 @@ const STORAGE_KEY = 'brickbuddy_session';
  */
 export function saveSession(state) {
   try {
-    const isCustom = state.selectedModel?.id?.startsWith('custom-');
+    // Any model NOT in the hand-authored preset list (dog/car/dino) needs to be
+    // persisted inline — otherwise reload can't reconstruct it from the id alone.
+    const id = state.selectedModel?.id || '';
+    const isCustom = id.startsWith('custom-') || id.startsWith('procedural-');
     const data = {
       stage: state.stage,
       selectedModelId: state.selectedModel?.id || null,

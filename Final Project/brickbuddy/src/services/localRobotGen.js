@@ -1,31 +1,13 @@
 /**
  * localRobotGen — Offline fallback for AI robot generation.
  *
- * Runs entirely in the browser. Parses the child's description for template
- * hints + color names and produces a custom robot by recoloring the closest
- * hand-authored preset. Used when /api/chat is throttled or unreachable so
- * "Talk to Me" and "Show Me" always produce a build, even with no AI.
+ * Runs entirely in the browser. Hands the description to the procedural
+ * builder, which composes a unique robot from archetypes + features instead
+ * of recoloring one of the three hand-authored templates. Used when
+ * /api/chat is throttled or unreachable so "Talk to Me" and "Show Me" always
+ * produce a build, even with no AI.
  */
-import { robotModels } from '../data/models';
-import { customizeModel } from './aiService';
-
-const TEMPLATE_KEYWORDS = {
-  dog: [
-    'dog', 'puppy', 'pup', 'cat', 'kitty', 'kitten', 'tiger', 'lion', 'wolf',
-    'fox', 'bear', 'panda', 'horse', 'pony', 'unicorn', 'spider', 'frog',
-    'bunny', 'rabbit', 'pet', 'animal', 'paw', 'fur', 'tail',
-  ],
-  car: [
-    'car', 'truck', 'train', 'bus', 'vehicle', 'racer', 'rover', 'tank',
-    'wheel', 'wheels', 'drive', 'driving', 'engine', 'motor', 'speed', 'race',
-    'racing', 'road', 'lorry', 'van',
-  ],
-  dino: [
-    'dino', 'dinosaur', 'trex', 't-rex', 'rex', 'raptor', 'jurassic', 'dragon',
-    'monster', 'beast', 'giant', 'huge', 'fierce', 'godzilla', 'lizard',
-    'stegosaurus', 'triceratops', 'velociraptor',
-  ],
-};
+import { buildProceduralRobot, detectStructuralIntent, applyChatModification } from './proceduralBuilder';
 
 const COLOR_KEYWORDS = {
   red:     '#EF4444',
@@ -57,96 +39,8 @@ const COLOR_KEYWORDS = {
   rainbow: '#F472B6',
 };
 
-function pickTemplate(text, photoHint) {
-  if (photoHint?.modelId) return photoHint.modelId;
-  const lower = text.toLowerCase();
-  const scores = { dog: 0, car: 0, dino: 0 };
-  for (const [id, words] of Object.entries(TEMPLATE_KEYWORDS)) {
-    for (const w of words) {
-      if (lower.includes(w)) scores[id]++;
-    }
-  }
-  const best = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  return best[0][1] > 0 ? best[0][0] : 'dog';
-}
-
-function pickColors(text, templateId) {
-  const lower = text.toLowerCase();
-  const found = [];
-  for (const [name, hex] of Object.entries(COLOR_KEYWORDS)) {
-    if (lower.includes(name) && !found.includes(hex)) found.push(hex);
-  }
-  // Fall back to a tasteful per-template default.
-  const defaults = {
-    dog:  ['#F59E0B', '#EF4444'],
-    car:  ['#3B82F6', '#EF4444'],
-    dino: ['#10B981', '#F59E0B'],
-  }[templateId];
-  return {
-    primary: found[0] || defaults[0],
-    accent:  found[1] || defaults[1],
-  };
-}
-
-// Pick the first noun-like word (>= 3 chars, not a stop-word) to use as a name seed.
-const STOP_WORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'but', 'with', 'for', 'to', 'of', 'in', 'on',
-  'is', 'are', 'am', 'i', 'my', 'me', 'we', 'you', 'want', 'like', 'build',
-  'make', 'that', 'this', 'very', 'really', 'super', 'so', 'some',
-]);
-
-function makeName(text, templateId) {
-  const words = text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w))
-    .slice(0, 2);
-  const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
-  const suffix = { dog: 'Pup', car: 'Racer', dino: 'Rex' }[templateId];
-  if (words.length >= 2) return `${cap(words[0])} ${cap(words[1])}`;
-  if (words.length === 1) return `${cap(words[0])} ${suffix}`;
-  return { dog: 'Mystery Pup', car: 'Mystery Racer', dino: 'Mystery Rex' }[templateId];
-}
-
-function pickEmoji(templateId, text) {
-  const lower = text.toLowerCase();
-  // Prefer a more specific emoji when the description mentions one.
-  const specific = {
-    dog: { cat: '🐱', tiger: '🐯', lion: '🦁', wolf: '🐺', fox: '🦊', bear: '🐻', panda: '🐼', horse: '🐴', unicorn: '🦄', frog: '🐸', spider: '🕷️', bunny: '🐰', rabbit: '🐰' },
-    car: { truck: '🚛', train: '🚂', bus: '🚌', tank: '🛡️', rover: '🚙', race: '🏎️' },
-    dino: { dragon: '🐉', monster: '👹', lizard: '🦎' },
-  }[templateId] || {};
-  for (const [word, emoji] of Object.entries(specific)) {
-    if (lower.includes(word)) return emoji;
-  }
-  return { dog: '🐶', car: '🏎️', dino: '🦖' }[templateId];
-}
-
 export function generateLocally(description, photoAnalysis = null) {
-  const text = (description || '').trim() || 'a friendly robot';
-  const templateId = pickTemplate(text, photoAnalysis);
-  const { primary, accent } = pickColors(text, templateId);
-  const name = makeName(text, templateId);
-  const emoji = pickEmoji(templateId, text);
-
-  const base = robotModels.find((m) => m.id === templateId);
-  if (!base) throw new Error(`no template for ${templateId}`);
-
-  const blueprint = {
-    name,
-    emoji,
-    template: templateId,
-    description: photoAnalysis
-      ? `A custom ${name} designed from your photo — ${photoAnalysis.reason || 'inspired by what you showed me'}.`
-      : `A one-of-a-kind ${name} built around your idea.`,
-    primaryColor: primary,
-    accentColor: accent,
-    pieceCount: base.pieceCount,
-  };
-  const custom = customizeModel(base, blueprint);
-  custom.difficulty = 'Custom';
-  return custom;
+  return buildProceduralRobot(description, photoAnalysis);
 }
 
 /**
@@ -204,6 +98,14 @@ export function detectStepRegenIntent(text, totalSteps) {
  * Detect any kind of modification intent from a chat message. Returns an
  * object describing the change to apply, or null if this is a normal chat
  * message (info request, greeting, etc.).
+ *
+ * Intent kinds (handled by BuildScreen):
+ *  - 'regen-step'      → re-roll one specific step via AI (fallback: procedural rebuild of that step)
+ *  - 'recolor'         → swap the dominant colors using `recolorFromText`
+ *  - 'scale'           → resize the whole model
+ *  - 'add-feature'     → append a new step with wings/tail/horns/etc.
+ *  - 'remove-feature'  → strip a previously-added feature step
+ *  - 'rebuild'         → throw out the current model and procedurally generate a new one
  */
 export function detectModIntent(text, model) {
   const lower = text.toLowerCase();
@@ -212,12 +114,28 @@ export function detectModIntent(text, model) {
   const stepIdx = detectStepRegenIntent(text, model?.steps?.length || 0);
   if (stepIdx != null) return { kind: 'regen-step', stepIndex: stepIdx };
 
-  // Color change ("make it blue", "change color to red", "paint it green")
-  const colorVerbs = /\b(make|change|paint|recolor|turn|switch)\b/;
-  const hasColorWord = Object.keys(COLOR_KEYWORDS).some((name) => lower.includes(name));
-  if (colorVerbs.test(lower) && hasColorWord) {
+  // Full rebuild ("turn it into a dragon", "make it a spider instead").
+  // Detected before recolor/feature so a phrase like "make it a green dragon"
+  // doesn't get parsed as a color change.
+  if (/\b(turn\s+it\s+into|make\s+it\s+(?:a|an)|change\s+it\s+(?:to|into)|rebuild|start\s+over|new\s+robot)\b/.test(lower)) {
+    return { kind: 'rebuild' };
+  }
+
+  // Structural changes (size, add/remove features) come from the procedural builder.
+  const structural = detectStructuralIntent(text);
+  if (structural) return { kind: structural };
+
+  // Color change ("make it blue", "change color to red", "paint it green",
+  // or just "blue please"). We accept either a color verb OR a bare color word
+  // — kids often skip the verb.
+  const colorVerbs = /\b(make|change|paint|recolor|turn|switch|color)\b/;
+  const hasColorWord = Object.keys(COLOR_KEYWORDS).some((name) => new RegExp(`\\b${name}\\b`).test(lower));
+  if (hasColorWord && (colorVerbs.test(lower) || lower.split(/\s+/).length <= 4)) {
     return { kind: 'recolor' };
   }
 
   return null;
 }
+
+// Re-export so BuildScreen can apply structural changes via a single import.
+export { applyChatModification };
