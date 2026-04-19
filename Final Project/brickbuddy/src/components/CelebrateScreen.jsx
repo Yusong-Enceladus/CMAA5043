@@ -143,95 +143,100 @@ export default function CelebrateScreen() {
         </div>
       </TopBar>
 
-      <div style={{ flex: 1, padding: '28px 20px 48px', overflowY: 'auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'grid', gap: 24 }}>
-          <div style={{ textAlign: 'center', display: 'grid', gap: 8, padding: '8px 0 4px' }}>
+      <div style={{
+        flex: 1, minHeight: 0, padding: '12px 16px 14px',
+        overflow: 'hidden', position: 'relative', zIndex: 1,
+      }}>
+        <div style={{
+          maxWidth: 1240, height: '100%', margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
+          gridTemplateRows: 'auto 1fr auto', gap: 12,
+        }}>
+          {/* Row 1 (spans cols): Title line */}
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', display: 'grid', gap: 2 }}>
             <Kicker color="var(--brick-red)">High five!</Kicker>
-            <Display size="lg" style={{ textWrap: 'balance' }}>
+            <Display size="md" style={{ textWrap: 'balance' }}>
               You built a {selectedModel?.name || 'robot'}.
             </Display>
-            <div style={{ fontSize: 18, color: 'var(--ink-3)' }}>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
               {stepCount} steps &middot; {brickCount} bricks &middot; {minutes !== '—' ? `~${minutes} of pure genius.` : 'pure genius.'}
             </div>
           </div>
 
-          <Card pad={0} style={{ aspectRatio: '16/9', overflow: 'hidden', position: 'relative' }}>
+          {/* Row 2 left: 3D trophy. Row 2 right: report + Buddy actions */}
+          <Card pad={0} style={{ overflow: 'hidden', position: 'relative', minHeight: 0 }}>
             <LegoViewer3D model={selectedModel} currentStep={Math.max(0, stepCount - 1)} autoRotate showControls={false} />
-            <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div style={{ display: 'grid', gap: 4 }}>
-                <div style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Your build</div>
-                <div className="serif" style={{ fontSize: 26, color: 'var(--ink)' }}>{selectedModel?.name}</div>
+            <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div style={{ display: 'grid', gap: 2 }}>
+                <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Your build</div>
+                <div className="serif" style={{ fontSize: 18, color: 'var(--ink)' }}>{selectedModel?.name}</div>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 4 }}>
                 {['#E14F3B', '#F59E0B', '#10B981', '#3B82F6', '#8357E6'].map(c =>
-                  <div key={c} style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <div key={c} style={{ width: 12, height: 12, borderRadius: 3, background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
                 )}
               </div>
             </div>
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
-            <Card pad={22} style={{ display: 'grid', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateRows: 'auto auto', gap: 10, minHeight: 0 }}>
+            <Card pad={12} style={{ display: 'grid', gap: 8 }}>
               <Kicker>Build report</Kicker>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
                   { k: stepCount,       l: 'steps',       c: 'var(--brick-blue)' },
                   { k: brickCount,      l: 'bricks',      c: 'var(--brick-red)' },
-                  { k: minutes,         l: 'build time',  c: 'var(--brick-green)' },
+                  { k: minutes,         l: 'time',        c: 'var(--brick-green)' },
                 ].map(s => (
-                  <div key={s.l} style={{ padding: 14, borderRadius: 14, background: 'rgba(26,20,16,0.04)', textAlign: 'center' }}>
-                    <div className="serif" style={{ fontSize: 34, color: s.c, lineHeight: 1 }}>{s.k}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>
+                  <div key={s.l} style={{ padding: '6px 8px', borderRadius: 10, background: 'rgba(26,20,16,0.04)', textAlign: 'center' }}>
+                    <div className="serif" style={{ fontSize: 22, color: s.c, lineHeight: 1, fontWeight: 700 }}>{s.k}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">&#x2605; {totalSteam} STEAM moments</Chip>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">&#x2605; {totalSteam} STEAM</Chip>
                 <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">&#x2605; {questionsAsked} questions</Chip>
                 <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">&#x2605; {topicsExplored} topics</Chip>
               </div>
-
               {achievements.length > 0 && (
-                <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-                  <Kicker color="var(--ink-3)">Achievements</Kicker>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {achievements.map(a => (
-                      <div key={a.id} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 8,
-                        padding: '6px 12px', borderRadius: 999, background: 'var(--paper-2)',
-                        fontSize: 12, fontWeight: 700, color: 'var(--ink-2)',
-                      }}>
-                        <span>{a.icon}</span>{a.label}
-                      </div>
-                    ))}
-                  </div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {achievements.slice(0, 4).map(a => (
+                    <div key={a.id} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '3px 8px', borderRadius: 999, background: 'var(--paper-2)',
+                      fontSize: 11, fontWeight: 700, color: 'var(--ink-2)',
+                    }}>
+                      <span>{a.icon}</span>{a.label}
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>
 
-            <Card pad={22} style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <BuddyFace size={56} state="celebrating" />
-                <div>
+            <Card pad={12} style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <BuddyFace size={34} state="celebrating" />
+                <div style={{ minWidth: 0 }}>
                   <Kicker color="var(--brick-red)">Buddy says</Kicker>
-                  <div className="serif" style={{ fontSize: 19, lineHeight: 1.2, textWrap: 'balance' }}>
-                    That was AWESOME. Want to show someone?
+                  <div className="serif" style={{ fontSize: 13, lineHeight: 1.2, fontWeight: 700 }}>
+                    That was AWESOME!
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                <Btn variant="ghost" icon="📜" onClick={handleDownloadCertificate}>
-                  {saved ? 'Certificate saved ✓' : 'Download certificate'}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <Btn variant="ghost" size="sm" icon="📜" onClick={handleDownloadCertificate}>
+                  {saved ? 'Saved ✓' : 'Certificate'}
                 </Btn>
-                <Btn variant="ghost" icon="🧑‍🎓">Show a grown-up</Btn>
-                <Btn variant="ghost" icon="🖨️" onClick={() => window.print()}>Print the instructions</Btn>
+                <Btn variant="ghost" size="sm" icon="🖨️" onClick={() => window.print()}>Print</Btn>
               </div>
             </Card>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Btn variant="ghost" size="lg" icon="🏠" onClick={() => setStage('splash')}>Back to start</Btn>
-            <Btn variant="brick" size="lg" icon="✨" onClick={resetSession}>Build something else</Btn>
+          {/* Row 3 (spans cols): CTAs */}
+          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Btn variant="ghost" size="md" icon="🏠" onClick={() => setStage('splash')}>Back to start</Btn>
+            <Btn variant="brick" size="md" icon="✨" onClick={resetSession}>Build something else</Btn>
           </div>
         </div>
       </div>
