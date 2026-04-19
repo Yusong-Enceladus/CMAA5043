@@ -218,18 +218,15 @@ export default function ImagineScreen() {
       </TopBar>
 
       <div style={{
-        flex: 1, display: 'grid', placeItems: 'center', padding: '24px 20px 48px',
+        flex: 1, minHeight: 0, display: 'grid', placeItems: 'center', padding: '12px 20px 16px',
         background: 'radial-gradient(ellipse at 50% 0%, #FFE0CC 0%, #FFF6EC 60%)',
+        overflow: 'hidden',
       }}>
-        <div style={{ width: '100%', maxWidth: 900, display: 'grid', gap: 28, justifyItems: 'center' }}>
-          <Display size="lg" style={{ textAlign: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 900, display: 'grid', gap: 14, justifyItems: 'center' }}>
+          <Display size="md" style={{ textAlign: 'center' }}>
             What do you want to build{' '}
             <span style={{ color: 'var(--brick-red)' }}>today?</span>
           </Display>
-
-          <p style={{ color: 'var(--ink-3)', fontSize: 18, margin: 0, textAlign: 'center', maxWidth: 560 }}>
-            Tell Buddy out loud, type it, or snap a picture of what you&apos;re imagining.
-          </p>
 
           {/* Mode toggle */}
           <div style={{ display: 'flex', gap: 8, padding: 4, background: 'rgba(26,20,16,0.06)', borderRadius: 999 }}>
@@ -249,7 +246,7 @@ export default function ImagineScreen() {
             ))}
           </div>
 
-          <div style={{ width: '100%', display: 'grid', placeItems: 'center', gap: 18 }}>
+          <div style={{ width: '100%', display: 'grid', placeItems: 'center', gap: 10 }}>
             {mode === 'voice' && (
               <VoicePrimary
                 speech={speech}
@@ -278,13 +275,13 @@ export default function ImagineScreen() {
           </div>
 
           {/* Presets */}
-          <div style={{ width: '100%', marginTop: 4 }}>
-            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ width: '100%', marginTop: 0 }}>
+            <div style={{ textAlign: 'center', marginBottom: 6 }}>
               <Kicker color="var(--ink-3)">or start from a template</Kicker>
             </div>
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 12,
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 10,
             }}>
               {robotModels.map(m => (
                 <PresetCard
@@ -331,14 +328,14 @@ function VoicePrimary({ speech, generating, hasTranscript, onMicTap, onConfirm }
   const state = active ? 'listening' : hasTranscript ? 'has-content' : generating ? 'thinking' : 'idle';
 
   return (
-    <Card pad={32} style={{ width: '100%', maxWidth: 620, display: 'grid', gap: 18, justifyItems: 'center' }}>
+    <Card pad={16} style={{ width: '100%', maxWidth: 620, display: 'grid', gap: 10, justifyItems: 'center' }}>
       {!speech.isSupported && (
-        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center' }}>
+        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center', fontSize: 13 }}>
           Voice isn&apos;t supported here. Try Chrome, Edge, or Safari — or use Type / Show.
         </p>
       )}
       {speech.error && (
-        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center' }}>
+        <p role="alert" style={{ color: 'var(--warn)', margin: 0, textAlign: 'center', fontSize: 13 }}>
           {speech.error}
         </p>
       )}
@@ -349,25 +346,25 @@ function VoicePrimary({ speech, generating, hasTranscript, onMicTap, onConfirm }
           disabled={generating || !speech.isSupported}
           aria-label={active ? 'Stop listening' : hasTranscript ? 'Re-record' : 'Start talking'}
           style={{
-            width: 120, height: 120, borderRadius: 999,
+            width: 84, height: 84, borderRadius: 999,
             background: active ? 'var(--live)' : generating ? 'var(--ink-3)' : 'var(--brick-red)',
-            color: '#FFF', fontSize: 44,
+            color: '#FFF', fontSize: 32,
             boxShadow: active
-              ? '0 6px 0 #1E4FC4, 0 0 0 12px rgba(47,111,235,0.14)'
-              : '0 6px 0 var(--brick-red-d), 0 12px 34px rgba(225,79,59,0.35)',
+              ? '0 6px 0 #1E4FC4, 0 0 0 10px rgba(47,111,235,0.14)'
+              : '0 6px 0 var(--brick-red-d), 0 12px 28px rgba(225,79,59,0.3)',
             display: 'grid', placeItems: 'center', position: 'relative',
           }}>
           {active ? '\u23F9' : hasTranscript ? '\u{1F504}' : '\u{1F3A4}'}
           {active && <>
-            <span style={{ position: 'absolute', inset: -10, borderRadius: 999, border: '2px solid rgba(47,111,235,0.5)', animation: 'pulseRing 1.4s ease-out infinite' }} />
-            <span style={{ position: 'absolute', inset: -10, borderRadius: 999, border: '2px solid rgba(47,111,235,0.35)', animation: 'pulseRing 1.4s 0.5s ease-out infinite' }} />
+            <span style={{ position: 'absolute', inset: -8, borderRadius: 999, border: '2px solid rgba(47,111,235,0.5)', animation: 'pulseRing 1.4s ease-out infinite' }} />
+            <span style={{ position: 'absolute', inset: -8, borderRadius: 999, border: '2px solid rgba(47,111,235,0.35)', animation: 'pulseRing 1.4s 0.5s ease-out infinite' }} />
           </>}
         </button>
       </div>
 
       {state === 'listening' && <VoiceWave active />}
       {state === 'idle' && (
-        <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 16 }}>
+        <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
           Tap the mic and say what you want to build
         </div>
       )}
@@ -489,21 +486,21 @@ function PresetCard({ model, picked, onPick }) {
       onClick={onPick}
       aria-pressed={picked}
       style={{
-        padding: 18, borderRadius: 18,
+        padding: 12, borderRadius: 14,
         background: picked ? 'rgba(225,79,59,0.08)' : 'var(--card)',
         border: `1px solid ${picked ? 'var(--brick-red)' : 'var(--rule)'}`,
         boxShadow: picked ? 'var(--shadow-2)' : 'var(--shadow-1)',
-        textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 8,
+        textAlign: 'left', cursor: 'pointer', display: 'grid', gap: 4,
         transition: 'transform 0.12s, box-shadow 0.2s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-2)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = picked ? 'var(--shadow-2)' : 'var(--shadow-1)'; }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 42 }}>{model.emoji}</span>
+        <span style={{ fontSize: 30 }}>{model.emoji}</span>
         <Chip bg={`${model.color || '#E14F3B'}22`} color={model.color || '#E14F3B'}>{model.difficulty || 'Easy'}</Chip>
       </div>
-      <div className="serif" style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{model.name}</div>
-      <div style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="serif" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>{model.name}</div>
+      <div style={{ color: 'var(--ink-3)', fontSize: 12, lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 6 }}>
         <PieceDot color={model.color || '#E14F3B'} />
         {model.pieceCount} pieces &middot; {model.steps.length} steps
       </div>

@@ -46,15 +46,23 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body {
   font-family: var(--sans);
   background: var(--paper);
   color: var(--ink);
   font-feature-settings: "ss01", "cv11";
   overscroll-behavior: none;
+  height: 100dvh;
+  overflow: hidden;
 }
-#root { min-height: 100vh; display: flex; flex-direction: column; }
+#root {
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 /* Utilities consumed by components. */
 .serif { font-family: var(--serif); font-weight: 700; letter-spacing: -0.02em; }

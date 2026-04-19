@@ -106,54 +106,61 @@ export default function LearnScreen() {
         </div>
       </TopBar>
 
-      <div style={{ flex: 1, padding: '28px 20px 40px', background: 'radial-gradient(ellipse at 50% 0%, #FFE0CC 0%, #FFF6EC 60%)', overflowY: 'auto' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 28 }}>
-          {/* Hero */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 24, alignItems: 'center' }}>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <Kicker>You built it.</Kicker>
-              <Display size="md">{learning.title}</Display>
-              <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 17, lineHeight: 1.5 }}>
-                Three big ideas your {selectedModel?.name || 'robot'} taught you. Buddy picked these
-                from the steps you just built.
-              </p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-                <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">
-                  {totalSteam} STEAM interactions
-                </Chip>
-                <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">
-                  {questionsAsked} questions asked
-                </Chip>
-                <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">
-                  {topicsExplored} topics explored
-                </Chip>
-              </div>
+      <div style={{
+        flex: 1, minHeight: 0, padding: '12px 16px 14px',
+        background: 'radial-gradient(ellipse at 50% 0%, #FFE0CC 0%, #FFF6EC 60%)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          maxWidth: 1240, height: '100%', margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+          gridTemplateRows: 'auto 1fr auto', gap: 12,
+        }}>
+          {/* Row 1: Hero title + stats (left) / 3D preview (right, spans rows 1-2) */}
+          <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
+            <Kicker>You built it.</Kicker>
+            <Display size="sm">{learning.title}</Display>
+            <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.45 }}>
+              Three big ideas your {selectedModel?.name || 'robot'} taught you.
+            </p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">{totalSteam} STEAM</Chip>
+              <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">{questionsAsked} questions</Chip>
+              <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">{topicsExplored} topics</Chip>
             </div>
-            <Card pad={0} style={{ aspectRatio: '4/3', overflow: 'hidden' }}>
-              <LegoViewer3D
-                model={selectedModel}
-                currentStep={(selectedModel?.steps?.length || 1) - 1}
-                autoRotate
-                showControls={false}
-              />
-            </Card>
           </div>
+          <Card pad={0} style={{ gridRow: '1 / span 2', overflow: 'hidden', minHeight: 0 }}>
+            <LegoViewer3D
+              model={selectedModel}
+              currentStep={(selectedModel?.steps?.length || 1) - 1}
+              autoRotate
+              showControls={false}
+            />
+          </Card>
 
-          {/* Highlights */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+          {/* Row 2 left: Highlights stacked compact */}
+          <div style={{ display: 'grid', gap: 8, gridAutoRows: 'min-content' }}>
             {learning.rows.map((h, i) => (
-              <Card key={i} pad={20} style={{ display: 'grid', gap: 8 }}>
-                <div style={{ fontSize: 34 }}>{h.icon}</div>
-                <div className="serif" style={{ fontSize: 20, lineHeight: 1.15 }}>{h.t}</div>
-                <div style={{ fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.5 }}>{h.d}</div>
-              </Card>
+              <div key={i} style={{
+                background: 'var(--card)', border: '1px solid var(--rule)',
+                boxShadow: 'var(--shadow-1)', borderRadius: 14, padding: '10px 12px',
+                display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 10, alignItems: 'center',
+              }}>
+                <div style={{ fontSize: 24 }}>{h.icon}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="serif" style={{ fontSize: 14, lineHeight: 1.2, fontWeight: 700 }}>{h.t}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.35 }}>{h.d}</div>
+                </div>
+              </div>
             ))}
           </div>
 
-          {/* Topic tabs + facts */}
-          <Card pad={24} style={{ display: 'grid', gap: 16 }}>
-            <Kicker>Dive deeper</Kicker>
-            <div role="tablist" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Row 3: Dive deeper (left) + Quiz (right) */}
+          <Card pad={12} style={{ display: 'grid', gap: 8, minHeight: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Kicker>Dive deeper</Kicker>
+            </div>
+            <div role="tablist" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {TOPICS.map(t => (
                 <button
                   key={t.key}
@@ -161,36 +168,36 @@ export default function LearnScreen() {
                   aria-selected={activeTopic === t.key}
                   onClick={() => handleTopicChange(t.key)}
                   style={{
-                    padding: '8px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13,
+                    padding: '5px 9px', borderRadius: 999, fontWeight: 700, fontSize: 11,
                     background: activeTopic === t.key ? 'var(--ink)' : 'rgba(26,20,16,0.06)',
                     color: activeTopic === t.key ? '#FFF6EC' : 'var(--ink-2)',
-                    display: 'inline-flex', gap: 8, alignItems: 'center',
+                    display: 'inline-flex', gap: 5, alignItems: 'center',
                   }}>
                   {t.label}
                   {steamProgress[t.key] > 0 && (
                     <span style={{
                       background: activeTopic === t.key ? 'rgba(255,246,236,0.2)' : 'var(--brick-red)',
                       color: activeTopic === t.key ? '#FFF6EC' : '#FFF',
-                      padding: '1px 6px', borderRadius: 999, fontSize: 11,
+                      padding: '0 5px', borderRadius: 999, fontSize: 10,
                     }}>{steamProgress[t.key]}</span>
                   )}
                 </button>
               ))}
             </div>
-            <div role="tabpanel" style={{ display: 'grid', gap: 10 }}>
-              {facts.map((f, i) => (
+            <div role="tabpanel" style={{ display: 'grid', gap: 6, minHeight: 0, overflow: 'hidden' }}>
+              {facts.slice(0, 1).map((f, i) => (
                 <div key={i} style={{
-                  padding: 16, borderRadius: 14, background: 'var(--paper-2)',
+                  padding: 10, borderRadius: 10, background: 'var(--paper-2)',
                   border: '1px solid var(--rule)',
                 }}>
-                  <div className="serif" style={{ fontSize: 17, lineHeight: 1.25, marginBottom: 6 }}>{f.q}</div>
+                  <div className="serif" style={{ fontSize: 13, lineHeight: 1.2, marginBottom: 4, fontWeight: 700 }}>{f.q}</div>
                   <div
-                    style={{ fontSize: 14, lineHeight: 1.55, color: 'var(--ink-2)' }}
+                    style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--ink-2)' }}
                     dangerouslySetInnerHTML={{ __html: f.a }}
                   />
                   {f.fact && (
-                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6, fontWeight: 600 }}>
-                      &#x1F31F; Fun Fact: {f.fact}
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4, fontWeight: 600 }}>
+                      &#x1F31F; {f.fact}
                     </div>
                   )}
                 </div>
@@ -198,23 +205,22 @@ export default function LearnScreen() {
             </div>
           </Card>
 
-          {/* Quiz */}
-          <Card pad={28} style={{ display: 'grid', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <BuddyFace size={42} state="speaking" />
-              <div>
+          <Card pad={12} style={{ display: 'grid', gap: 8, minHeight: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BuddyFace size={28} state="speaking" />
+              <div style={{ minWidth: 0 }}>
                 <Kicker color="var(--brick-red)">Quick quiz</Kicker>
-                <div className="serif" style={{ fontSize: 22 }}>Two questions. Ready?</div>
+                <div className="serif" style={{ fontSize: 14, lineHeight: 1.15, fontWeight: 700 }}>Two questions. Ready?</div>
               </div>
               <div style={{ flex: 1 }} />
-              <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                {done ? `${score}/${quiz.length}` : `${qi + 1} / ${quiz.length}`}
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                {done ? `${score}/${quiz.length}` : `${qi + 1}/${quiz.length}`}
               </div>
             </div>
             {!done ? (
-              <div style={{ display: 'grid', gap: 12 }}>
-                <div className="serif" style={{ fontSize: 22, lineHeight: 1.2 }}>{quiz[qi].q}</div>
-                <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div className="serif" style={{ fontSize: 14, lineHeight: 1.2, fontWeight: 700 }}>{quiz[qi].q}</div>
+                <div style={{ display: 'grid', gap: 5 }}>
                   {quiz[qi].options.map((o, i) => {
                     const correct = picked !== null && i === quiz[qi].answer;
                     const wrong   = picked !== null && i === picked && i !== quiz[qi].answer;
@@ -224,10 +230,10 @@ export default function LearnScreen() {
                         onClick={() => handlePick(i)}
                         disabled={picked !== null}
                         style={{
-                          padding: '14px 16px', borderRadius: 14, textAlign: 'left',
+                          padding: '8px 10px', borderRadius: 10, textAlign: 'left',
                           background: correct ? 'rgba(15,153,104,0.12)' : wrong ? 'rgba(225,79,59,0.12)' : 'rgba(26,20,16,0.04)',
                           border: `1.5px solid ${correct ? 'var(--ok)' : wrong ? 'var(--brick-red)' : 'transparent'}`,
-                          fontSize: 15, fontWeight: 600, color: 'var(--ink)',
+                          fontSize: 12.5, fontWeight: 600, color: 'var(--ink)',
                           cursor: picked !== null ? 'default' : 'pointer',
                         }}>
                         {o}{correct && ' \u2713'}{wrong && ' \u2715'}
@@ -237,19 +243,19 @@ export default function LearnScreen() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: 10, textAlign: 'center', padding: '16px 0' }}>
-                <div style={{ fontSize: 56, fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--brick-red)' }}>
+              <div style={{ display: 'grid', gap: 6, textAlign: 'center', padding: '6px 0' }}>
+                <div style={{ fontSize: 34, fontFamily: 'var(--serif)', fontWeight: 700, color: 'var(--brick-red)', lineHeight: 1 }}>
                   {score}/{quiz.length}
                 </div>
-                <div style={{ fontSize: 16, color: 'var(--ink-2)' }}>
-                  {score === quiz.length ? 'Perfect score! You totally got it. \u{1F31F}' : "Nice work — you're learning fast. \u{1F4AA}"}
+                <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                  {score === quiz.length ? 'Perfect! \u{1F31F}' : "Nice work! \u{1F4AA}"}
                 </div>
               </div>
             )}
           </Card>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Btn variant="brick" size="lg" onClick={() => { if (soundEnabled) playSuccess(); setStage('celebrate'); }}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+            <Btn variant="brick" size="md" onClick={() => { if (soundEnabled) playSuccess(); setStage('celebrate'); }}
               icon="🎉">
               Celebrate your build
             </Btn>
