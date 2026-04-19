@@ -47,14 +47,18 @@ const ARCHETYPES = {
   quadruped: { keys: ['dog', 'puppy', 'cat', 'kitty', 'tiger', 'lion', 'wolf', 'fox', 'bear', 'panda', 'horse', 'pony', 'unicorn', 'pet', 'animal', 'paw', 'fur'] },
   biped:     { keys: ['robot', 'humanoid', 'android', 'man', 'person', 'warrior', 'knight', 'guard', 'hero'] },
   vehicle:   { keys: ['car', 'truck', 'train', 'bus', 'racer', 'rover', 'tank', 'wheel', 'wheels', 'drive', 'engine', 'motor', 'race', 'racing', 'vehicle', 'lorry', 'van'] },
-  serpent:   { keys: ['snake', 'serpent', 'worm', 'caterpillar', 'centipede', 'slug'] },
+  marine:    { keys: ['fish', 'shark', 'whale', 'dolphin', 'turtle', 'tortoise', 'stingray', 'ray', 'jellyfish', 'seal', 'orca', 'manta', 'seahorse', 'sea', 'ocean', 'aquarium', 'submarine', 'sub', 'swim', 'swims', 'underwater', 'marine', 'fin', 'fins', 'gills'] },
+  serpent:   { keys: ['snake', 'serpent', 'worm', 'caterpillar', 'centipede', 'slug', 'eel'] },
   flyer:     { keys: ['bird', 'eagle', 'owl', 'plane', 'jet', 'airplane', 'rocket', 'ship', 'butterfly', 'bee', 'bat', 'pterodactyl'] },
-  giant:     { keys: ['dino', 'dinosaur', 'trex', 't-rex', 'rex', 'raptor', 'jurassic', 'godzilla', 'lizard', 'stegosaurus', 'triceratops', 'monster', 'beast', 'giant', 'huge', 'titan', 'mech'] },
-  arachnid:  { keys: ['spider', 'crab', 'scorpion', 'octopus', 'squid'] },
-  dragon:    { keys: ['dragon', 'wyvern', 'drake'] },
+  giant:     { keys: ['dino', 'dinosaur', 'trex', 't-rex', 'rex', 'raptor', 'jurassic', 'godzilla', 'stegosaurus', 'triceratops', 'monster', 'beast', 'giant', 'huge', 'titan', 'mech'] },
+  arachnid:  { keys: ['spider', 'crab', 'scorpion', 'octopus', 'squid', 'lobster', 'insect', 'bug'] },
+  dragon:    { keys: ['dragon', 'wyvern', 'drake', 'lizard'] },
 };
 
-const ARCHETYPE_ORDER = ['dragon', 'giant', 'arachnid', 'vehicle', 'flyer', 'serpent', 'biped', 'quadruped'];
+// Check in this order — more-specific archetypes before generic ones. "fish"
+// ahead of "giant" so "fish robot" doesn't get eaten by the "robot"→biped match
+// path, and "dragon" stays ahead of "lizard"-shaped creatures.
+const ARCHETYPE_ORDER = ['dragon', 'marine', 'giant', 'arachnid', 'vehicle', 'flyer', 'serpent', 'biped', 'quadruped'];
 
 const FEATURE_KEYWORDS = {
   wings:    ['wing', 'wings', 'fly', 'flying', 'flap'],
@@ -189,7 +193,7 @@ function makeName(text, archetype) {
   const suffix = {
     quadruped: 'Pup', biped: 'Bot', vehicle: 'Racer',
     serpent:   'Snake', flyer: 'Flyer', giant: 'Rex',
-    arachnid:  'Spider', dragon: 'Dragon',
+    arachnid:  'Spider', dragon: 'Dragon', marine: 'Fish',
   }[archetype];
   if (words.length >= 2 && words[0] !== words[1]) {
     return `${cap(words[0])} ${cap(words[1])}`;
@@ -213,18 +217,19 @@ function pickEmoji(archetype, text) {
     quadruped: { cat: '🐱', tiger: '🐯', lion: '🦁', wolf: '🐺', fox: '🦊', bear: '🐻', panda: '🐼', horse: '🐴', unicorn: '🦄', frog: '🐸', bunny: '🐰', rabbit: '🐰', dog: '🐶' },
     biped:     { warrior: '⚔️', knight: '🤺', hero: '🦸', android: '🤖' },
     vehicle:   { truck: '🚛', train: '🚂', bus: '🚌', tank: '🚜', rover: '🚙', race: '🏎️', car: '🚗' },
-    serpent:   { snake: '🐍', worm: '🐛' },
+    marine:    { shark: '🦈', whale: '🐋', dolphin: '🐬', turtle: '🐢', tortoise: '🐢', octopus: '🐙', jellyfish: '🪼', seahorse: '🐙', submarine: '🚢', sub: '🚢', fish: '🐟' },
+    serpent:   { snake: '🐍', worm: '🐛', eel: '🐍' },
     flyer:     { plane: '✈️', jet: '🛩️', rocket: '🚀', bird: '🐦', butterfly: '🦋', bee: '🐝', bat: '🦇' },
     giant:     { stegosaurus: '🦕', triceratops: '🦖', dino: '🦖', monster: '👹', mech: '🤖' },
-    arachnid:  { spider: '🕷️', crab: '🦀', scorpion: '🦂', octopus: '🐙' },
-    dragon:    { dragon: '🐉', wyvern: '🐲' },
+    arachnid:  { spider: '🕷️', crab: '🦀', scorpion: '🦂', octopus: '🐙', lobster: '🦞' },
+    dragon:    { dragon: '🐉', wyvern: '🐲', lizard: '🦎' },
   }[archetype] || {};
   for (const [word, emoji] of Object.entries(specifics)) {
     if (lower.includes(word)) return emoji;
   }
   return {
     quadruped: '🐶', biped: '🤖', vehicle: '🏎️', serpent: '🐍',
-    flyer: '🦅', giant: '🦖', arachnid: '🕷️', dragon: '🐉',
+    flyer: '🦅', giant: '🦖', arachnid: '🕷️', dragon: '🐉', marine: '🐟',
   }[archetype];
 }
 
@@ -236,6 +241,7 @@ function buildPalette(text, archetype) {
     quadruped: ['#F59E0B', '#EF4444', '#1F2937'],
     biped:     ['#3B82F6', '#9CA3AF', '#FCD34D'],
     vehicle:   ['#3B82F6', '#EF4444', '#1F2937'],
+    marine:    ['#38BDF8', '#3B82F6', '#FCD34D'],
     serpent:   ['#10B981', '#FCD34D', '#1F2937'],
     flyer:     ['#38BDF8', '#F3F4F6', '#1F2937'],
     giant:     ['#10B981', '#F59E0B', '#1F2937'],
@@ -776,10 +782,90 @@ function buildDragon(palette, opts) {
   ];
 }
 
+function buildMarine(palette, opts) {
+  const { primary, accent, secondary, eye, nose } = palette;
+  const seed = opts.seed % 3;
+  const bodyLen = 6 + seed; // 6..8
+  const bodyW = 2.4;
+  const bodyH = 1.8;
+  // Body sits on a low water-surface pedestal so it appears to float.
+  const pedestalH = P;
+
+  return [
+    {
+      title: 'Lay the Water Base', emoji: '🌊',
+      desc: `Place a wide ${colorWord(secondary)} plate as the ocean floor.`,
+      tip: 'Real aquarium robots have sensors in the floor to check the water is clean.',
+      steamTag: 'science',
+      newParts: [
+        plate(0, 0, 0, 5, bodyLen + 2, secondary),
+      ],
+    },
+    {
+      title: 'Build the Belly', emoji: '🐟',
+      desc: `Stack a smooth ${colorWord(primary)} belly on top of the water plate.`,
+      tip: 'A rounded belly helps a fish slip through water with less drag.',
+      steamTag: 'science',
+      newParts: [
+        tallBrick(0, pedestalH, 0, bodyW, bodyLen, bodyH * 0.55, primary),
+      ],
+    },
+    {
+      title: 'Add the Back', emoji: '🧱',
+      desc: `Add a ${colorWord(accent)} back piece on top of the belly.`,
+      tip: 'The darker back, lighter belly trick is called "countershading" — predators from above can\u2019t spot the fish.',
+      steamTag: 'art',
+      newParts: [
+        tallBrick(0, pedestalH + bodyH * 0.55, 0, bodyW, bodyLen, bodyH * 0.45, accent),
+      ],
+    },
+    {
+      title: 'Attach the Tail Fin', emoji: '🪝',
+      desc: `Place a ${colorWord(accent)} slope at the back for the tail fin.`,
+      tip: 'The tail fin is the fish\u2019s motor — it pushes water backwards to go forwards.',
+      steamTag: 'engineering',
+      newParts: [
+        tallSlope(0, pedestalH, bodyLen / 2 + 0.6, bodyW + 0.6, 1.6, bodyH, accent),
+      ],
+    },
+    {
+      title: 'Mount the Dorsal Fin', emoji: '🔺',
+      desc: `Stick a pointy ${colorWord(accent)} fin on top of the back.`,
+      tip: 'The dorsal fin keeps the fish upright so it doesn\u2019t roll sideways.',
+      steamTag: 'engineering',
+      newParts: [
+        tallSlope(0, pedestalH + bodyH, -0.4, 0.8, 2.0, B, accent),
+      ],
+    },
+    {
+      title: 'Add Side Fins', emoji: '🦈',
+      desc: `Add two ${colorWord(secondary)} side fins that let the fish steer.`,
+      tip: 'Pectoral fins work like steering wheels — one goes up, the other goes down, to turn.',
+      steamTag: 'engineering',
+      newParts: [
+        tallSlope(-(bodyW / 2 + 0.5), pedestalH + bodyH * 0.3, 0.4, 1.4, 1.6, P, secondary),
+        tallSlope( (bodyW / 2 + 0.5), pedestalH + bodyH * 0.3, 0.4, 1.4, 1.6, P, secondary),
+      ],
+    },
+    {
+      title: 'Give It Big Eyes', emoji: '👀',
+      desc: `Place two round ${colorWord(eye)} eyes on the front of the head.`,
+      tip: 'Fish eyes on the sides give them a huge field of view — nearly all the way around.',
+      steamTag: 'science',
+      newParts: [
+        cyl(-(bodyW / 2 - 0.1), pedestalH + bodyH * 0.7, -bodyLen / 2 - 0.05, 0.22, 0.35, eye),
+        cyl( (bodyW / 2 - 0.1), pedestalH + bodyH * 0.7, -bodyLen / 2 - 0.05, 0.22, 0.35, eye),
+        cyl(0, pedestalH + bodyH * 0.35, -bodyLen / 2 - 0.1, 0.12, 0.25, nose),
+      ],
+    },
+  ];
+}
+
 const ARCHETYPE_BUILDERS = {
   quadruped: buildQuadruped,
   biped:     buildBiped,
   vehicle:   buildVehicle,
+  marine:    buildMarine,
   serpent:   buildSerpent,
   flyer:     buildFlyer,
   giant:     buildGiant,

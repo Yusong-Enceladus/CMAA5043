@@ -161,12 +161,21 @@ export async function generateFullRobot(description) {
     try {
       bp = JSON.parse(repairJSON(match[0]));
     } catch (e2) {
-      throw new Error(`JSON parse failed: ${e2.message}`);
+      throw new Error(`JSON parse failed (model: ${data.model}): ${e2.message}`);
     }
   }
 
-  validateBlueprint(bp);
-  const resolvedSteps = resolveSteps(bp.steps);
+  try {
+    validateBlueprint(bp);
+  } catch (err) {
+    // Log the raw AI output when validation fails so a free model producing
+    // a slightly-off schema can be debugged without a DevTools replay.
+    if (typeof window !== 'undefined') {
+      console.warn('[BrickBuddy] blueprint validation failed:', err.message, { model: data.model, raw: bp });
+    }
+    throw err;
+  }
+  const resolvedSteps = resolveSteps(bp.steps, { primary: bp.primaryColor, accent: bp.accentColor });
 
   // Derive `pieces` list per step from the raw bricks (nicer for the UI).
   resolvedSteps.forEach((s, i) => {
