@@ -37,23 +37,22 @@ const DEFAULT_MODELS = [
                                               //   "server unavailable" error for kids.
 ];
 
-// JSON-generation chain. Deliberately short (2 models) because each attempt
-// gets 50s and the whole request must fit under CF's ~100s inbound ceiling.
-// Chosen via an empirical bake-off across 8 popular :free models × 4 prompts
-// ("a fish with wings", "a four-legged dog", "a spider with 8 legs", "a
-// rocket ship") scored on symmetry + feature-named steps + structural fit:
+// JSON-generation chain. Nemotron 3 Super (120B MoE with built-in reasoning)
+// is the most intelligent free model currently on OpenRouter — on benchmarks
+// it beats gpt-oss-120b on spatial reasoning, which directly helps blueprint
+// composition. Earlier rounds showed it failing because:
+//   (a) response_format: json_object truncated its output to ~750 chars
+//   (b) its hidden reasoning tokens ate the max_tokens budget
+// Both fixed in callModel(): response_format is now skipped for reasoning
+// models, reasoning.max_tokens is capped at 200, and max_tokens bumped to
+// 4000 so output has room. Verified directly against OpenRouter — Nemotron
+// with these settings returns complete 2300+ char blueprints in 19-55s.
 //
-//   openai/gpt-oss-120b        4/4  score 7.13  sym 0.47  feat 0.85  avg 42s
-//   google/gemma-4-26b-a4b-it  3/4  score 6.91  sym 0.50  feat 0.74  avg 18s
-//   openai/gpt-oss-20b         1/4  score 5.95  sym 0.43  feat 0.71  avg 34s
-//
-// gpt-oss-120b wins on reliability; gemma-4-26b-a4b is a fast, nearly-as-
-// good secondary for when 120b is rate-limited. Llama 3.3, Qwen3, Hermes-405b,
-// Nemotron all got 429'd throughout the test window — they're not broken,
-// just unreliable on free-tier at peak times.
+// gpt-oss-120b stays in the chain as a fast fallback if Nemotron 429s or
+// times out; it's the reliability leader from the bake-off (4/4, sym 0.47).
 const JSON_MODELS = [
-  'openai/gpt-oss-120b:free',                 // bake-off winner — 4/4, best score
-  'google/gemma-4-26b-a4b-it:free',           // fastest, Gemma 4 MoE; good fallback
+  'nvidia/nemotron-3-super-120b-a12b:free',   // smartest free; 120B MoE w/ reasoning
+  'openai/gpt-oss-120b:free',                 // fast fallback; bake-off leader
 ];
 
 const MAX_MESSAGES = 12;
@@ -64,13 +63,11 @@ const MAX_TOKENS_CHAT = 220;
 // ramble, but generous enough that real blueprints aren't truncated.
 const MAX_TOKENS_JSON = 1800;
 const PER_ATTEMPT_TIMEOUT_MS_CHAT = 10000; // short — falls through fast if throttled
-// Free models generate ~25-40 tokens/sec. 1800 tokens = ~45-70s worst case.
-// 30s was too aggressive — complex prompts like "fish with wings" kept
-// aborting mid-generation, burning through the whole chain in 90s and
-// returning "all models unavailable" to the client. 50s gives the first
-// model enough time and two attempts fit under Cloudflare's ~100s inbound
-// wall-clock ceiling before the edge returns a 524.
-const PER_ATTEMPT_TIMEOUT_MS_JSON = 50000;
+// Reasoning model (Nemotron) generates complete blueprints in 24-55s with
+// reasoning.max_tokens: 200. Fast model (gpt-oss-120b) in 20-40s. 45s per
+// attempt lets us fit TWO models under Cloudflare's ~100s inbound ceiling:
+// 45 + 45 = 90s worst case. In practice one attempt usually succeeds.
+const PER_ATTEMPT_TIMEOUT_MS_JSON = 45000;
 // 402 = OpenRouter "insufficient credit" → skip to the next model in the
 // chain (usually a `:free` one) instead of failing the whole request.
 const RETRIABLE = new Set([402, 404, 408, 425, 429, 500, 502, 503, 504]);
@@ -104,22 +101,30 @@ async function callModel(modelId, messages, apiKey, temperature, siteUrl, maxTok
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // Reasoning-capable models need special handling:
+    //   1. Reasoning tokens count against max_tokens, so bump the budget.
+    //   2. `reasoning.max_tokens: 200` forces a short reasoning pass (verified
+    //      empirically: Nemotron at 200 → 19s + 2700 char output; at 800 →
+    //      67s + 1900 char output — tight reasoning is BOTH faster and gives
+    //      more room for output).
+    //   3. `response_format: json_object` causes Nemotron to emit a truncated
+    //      skeleton and stop at ~750 chars — we strictly rely on the system
+    //      prompt for JSON instruction on reasoning models.
+    const reasoningModel = /nemotron|deepseek-r1|thinking|qwen3-next-80b-a3b-thinking/i.test(modelId);
+    const effectiveMaxTokens = reasoningModel ? Math.max(maxTokens, 4000) : maxTokens;
+
     const payload = {
       model: modelId,
       messages,
       temperature,
-      max_tokens: maxTokens,
-      // Ask OpenRouter to hide reasoning tokens from reasoning-capable
-      // models. Only takes effect when a model exposes reasoning as a
-      // separate field — models that inline CoT in `content` need the
-      // `stripThinking` pass below.
-      reasoning: { exclude: true },
+      max_tokens: effectiveMaxTokens,
+      reasoning: reasoningModel
+        ? { exclude: true, max_tokens: 200 }   // tight budget = fast + complete output
+        : { exclude: true },
     };
-    if (jsonMode) {
-      // OpenAI-compatible structured-output hint. Supported by most paid
-      // models (Claude, GPT-4o, Gemini) and silently ignored by older free
-      // models. Still ask for plain JSON in the system prompt so all models
-      // — supported or not — get the message.
+    if (jsonMode && !reasoningModel) {
+      // Structured-output hint for non-reasoning models. Verified harmful
+      // on Nemotron (truncates output), so we gate it.
       payload.response_format = { type: 'json_object' };
     }
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
