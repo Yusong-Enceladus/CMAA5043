@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useBuild } from '../context/BuildContext';
+import { ProgressDots } from '../App';
 import { playCelebration } from '../services/soundEffects';
 import LegoViewer3D from './LegoViewer3D';
 import { BuddyFace } from '../design/Buddy';
@@ -137,106 +138,129 @@ export default function CelebrateScreen() {
   return (
     <div className="bb-screen" style={{ position: 'relative' }}>
       <Confetti />
-      <TopBar onBack={() => setStage('learn')} progressLabel="STAGE 4 · DONE!">
+      <TopBar onBack={() => setStage('learn')} right={<ProgressDots />}>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <Chip bg="var(--brick-red)" color="#fff">&#x1F3C6; YOU BUILT IT</Chip>
         </div>
       </TopBar>
 
       <div style={{
-        flex: 1, minHeight: 0, padding: '12px 16px 14px',
+        flex: 1, minHeight: 0, padding: '16px 24px 18px',
         overflow: 'hidden', position: 'relative', zIndex: 1,
       }}>
         <div style={{
-          maxWidth: 1240, height: '100%', margin: '0 auto',
-          display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
-          gridTemplateRows: 'auto 1fr auto', gap: 12,
+          maxWidth: 1200, height: '100%', margin: '0 auto',
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(320px, 0.85fr)',
+          gridTemplateRows: 'auto 1fr', gap: 18, alignItems: 'stretch',
         }}>
-          {/* Row 1 (spans cols): Title line */}
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', display: 'grid', gap: 2 }}>
+          {/* Row 1 (spans): Hero title */}
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', display: 'grid', gap: 4 }}>
             <Kicker color="var(--brick-red)">High five!</Kicker>
             <Display size="md" style={{ textWrap: 'balance' }}>
               You built a {selectedModel?.name || 'robot'}.
             </Display>
-            <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+            <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>
               {stepCount} steps &middot; {brickCount} bricks &middot; {minutes !== '—' ? `~${minutes} of pure genius.` : 'pure genius.'}
             </div>
           </div>
 
-          {/* Row 2 left: 3D trophy. Row 2 right: report + Buddy actions */}
+          {/* Row 2 left: 3D trophy */}
           <Card pad={0} style={{ overflow: 'hidden', position: 'relative', minHeight: 0 }}>
             <LegoViewer3D model={selectedModel} currentStep={Math.max(0, stepCount - 1)} autoRotate showControls={false} />
-            <div style={{ position: 'absolute', bottom: 10, left: 12, right: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div style={{ display: 'grid', gap: 2 }}>
+            <div style={{ position: 'absolute', bottom: 14, left: 16, right: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div style={{ display: 'grid', gap: 3 }}>
                 <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-4)' }}>Your build</div>
-                <div className="serif" style={{ fontSize: 18, color: 'var(--ink)' }}>{selectedModel?.name}</div>
+                <div className="serif" style={{ fontSize: 22, color: 'var(--ink)' }}>{selectedModel?.name}</div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {['#E14F3B', '#F59E0B', '#10B981', '#3B82F6', '#8357E6'].map(c =>
-                  <div key={c} style={{ width: 12, height: 12, borderRadius: 3, background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <div key={c} style={{ width: 14, height: 14, borderRadius: 3, background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
                 )}
               </div>
             </div>
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateRows: 'auto auto', gap: 10, minHeight: 0 }}>
-            <Card pad={12} style={{ display: 'grid', gap: 8 }}>
+          {/* Row 2 right: stats + Buddy + CTAs, all stacked */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0 }}>
+            <Card pad={16} style={{ display: 'grid', gap: 10 }}>
               <Kicker>Build report</Kicker>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
-                  { k: stepCount,       l: 'steps',       c: 'var(--brick-blue)' },
-                  { k: brickCount,      l: 'bricks',      c: 'var(--brick-red)' },
-                  { k: minutes,         l: 'time',        c: 'var(--brick-green)' },
+                  { k: stepCount,  l: 'steps',  c: 'var(--brick-blue)' },
+                  { k: brickCount, l: 'bricks', c: 'var(--brick-red)' },
+                  { k: minutes,    l: 'time',   c: 'var(--brick-green)' },
                 ].map(s => (
-                  <div key={s.l} style={{ padding: '6px 8px', borderRadius: 10, background: 'rgba(26,20,16,0.04)', textAlign: 'center' }}>
-                    <div className="serif" style={{ fontSize: 22, color: s.c, lineHeight: 1, fontWeight: 700 }}>{s.k}</div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>
+                  <div key={s.l} style={{ padding: '8px 6px', borderRadius: 12, background: 'rgba(26,20,16,0.04)', textAlign: 'center' }}>
+                    <div className="serif" style={{ fontSize: 26, color: s.c, lineHeight: 1, fontWeight: 700 }}>{s.k}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">&#x2605; {totalSteam} STEAM</Chip>
                 <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">&#x2605; {questionsAsked} questions</Chip>
                 <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">&#x2605; {topicsExplored} topics</Chip>
               </div>
-              {achievements.length > 0 && (
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                  {achievements.slice(0, 4).map(a => (
-                    <div key={a.id} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      padding: '3px 8px', borderRadius: 999, background: 'var(--paper-2)',
-                      fontSize: 11, fontWeight: 700, color: 'var(--ink-2)',
-                    }}>
-                      <span>{a.icon}</span>{a.label}
-                    </div>
-                  ))}
-                </div>
-              )}
             </Card>
 
-            <Card pad={12} style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <BuddyFace size={34} state="celebrating" />
-                <div style={{ minWidth: 0 }}>
-                  <Kicker color="var(--brick-red)">Buddy says</Kicker>
-                  <div className="serif" style={{ fontSize: 13, lineHeight: 1.2, fontWeight: 700 }}>
-                    That was AWESOME!
+            {achievements.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {achievements.slice(0, 4).map(a => (
+                  <div key={a.id} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '5px 10px', borderRadius: 999, background: 'var(--paper-2)',
+                    fontSize: 12, fontWeight: 700, color: 'var(--ink-2)',
+                    border: '1px solid var(--rule)',
+                  }}>
+                    <span>{a.icon}</span>{a.label}
                   </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{
+              display: 'flex', gap: 10, alignItems: 'center',
+              padding: '10px 14px', borderRadius: 16,
+              background: 'rgba(225,79,59,0.08)', border: '1px solid rgba(225,79,59,0.2)',
+            }}>
+              <BuddyFace size={38} state="celebrating" />
+              <div style={{ minWidth: 0 }}>
+                <Kicker color="var(--brick-red)">Buddy says</Kicker>
+                <div className="serif" style={{ fontSize: 15, lineHeight: 1.2, fontWeight: 700 }}>
+                  That was AWESOME!
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <Btn variant="ghost" size="sm" icon="📜" onClick={handleDownloadCertificate}>
-                  {saved ? 'Saved ✓' : 'Certificate'}
-                </Btn>
-                <Btn variant="ghost" size="sm" icon="🖨️" onClick={() => window.print()}>Print</Btn>
-              </div>
-            </Card>
-          </div>
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={handleDownloadCertificate}
+                title="Download certificate"
+                aria-label="Download certificate"
+                style={{
+                  flexShrink: 0, width: 38, height: 38, borderRadius: 10,
+                  background: 'var(--card)', border: '1px solid var(--rule-2)',
+                  fontSize: 16, display: 'grid', placeItems: 'center', cursor: 'pointer',
+                }}>
+                {saved ? '\u2713' : '\u{1F4DC}'}
+              </button>
+              <button
+                onClick={() => window.print()}
+                title="Print instructions"
+                aria-label="Print instructions"
+                style={{
+                  flexShrink: 0, width: 38, height: 38, borderRadius: 10,
+                  background: 'var(--card)', border: '1px solid var(--rule-2)',
+                  fontSize: 16, display: 'grid', placeItems: 'center', cursor: 'pointer',
+                }}>
+                &#x1F5A8;&#xFE0F;
+              </button>
+            </div>
 
-          {/* Row 3 (spans cols): CTAs */}
-          <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <Btn variant="ghost" size="md" icon="🏠" onClick={() => setStage('splash')}>Back to start</Btn>
-            <Btn variant="brick" size="md" icon="✨" onClick={resetSession}>Build something else</Btn>
+            <div style={{ flex: 1 }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: 10 }}>
+              <Btn variant="outline" size="md" icon="🏠" onClick={() => setStage('splash')}>Home</Btn>
+              <Btn variant="brick" size="md" icon="✨" onClick={resetSession}>Build something else</Btn>
+            </div>
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useBuild } from '../context/BuildContext';
+import { ProgressDots } from '../App';
 import { getSmartAIResponse, getStepWelcome, hasAIKey } from '../services/chatEngine';
 import { regenerateStep } from '../services/aiService';
 import {
@@ -351,7 +352,7 @@ export default function BuildScreen() {
 
   return (
     <div className="bb-screen" role="main" aria-label={`Building ${selectedModel.name}`}>
-      <TopBar onBack={() => setStage('imagine')} progressLabel={`STEP ${currentStep + 1} / ${selectedModel.steps.length}`}>
+      <TopBar onBack={() => setStage('imagine')} progressLabel={`STEP ${currentStep + 1} / ${selectedModel.steps.length}`} right={<ProgressDots />}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <StepProgress total={selectedModel.steps.length} current={currentStep} />
           <Chip bg="var(--paper-2)" color="var(--ink-2)">
