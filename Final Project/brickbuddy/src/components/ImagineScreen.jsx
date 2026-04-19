@@ -130,7 +130,9 @@ export default function ImagineScreen() {
       ? `${text} (Hint: looks closest to a ${photoAnalysis.modelId}.)`
       : text;
 
-    // Path 1: full AI geometry.
+    // Path 1: full AI geometry. Log any failure — we've been burned too many
+    // times by silent fallbacks that leave the user confused about why they
+    // got a procedural robot when the API was reachable.
     try {
       const custom = await generateFullRobot(prompt);
       selectModel(custom);
@@ -141,7 +143,9 @@ export default function ImagineScreen() {
       );
       setGenerating(false);
       return;
-    } catch { /* fall through */ }
+    } catch (err) {
+      console.warn('[BrickBuddy] Path 1 (full AI geometry) failed:', err?.message || err, err);
+    }
 
     // Path 2: AI blueprint + recolor a preset.
     try {
@@ -156,7 +160,9 @@ export default function ImagineScreen() {
       );
       setGenerating(false);
       return;
-    } catch { /* fall through to local fallback */ }
+    } catch (err) {
+      console.warn('[BrickBuddy] Path 2 (recolor preset) failed:', err?.message || err);
+    }
 
     // Path 3: local, offline fallback. ALWAYS succeeds.
     try {
