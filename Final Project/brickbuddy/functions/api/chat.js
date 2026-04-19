@@ -37,28 +37,32 @@ const DEFAULT_MODELS = [
                                               //   "server unavailable" error for kids.
 ];
 
-// JSON-generation chain — same principle. Models that follow "JSON only"
-// strictly come first. Nemotron / Qwen-thinking are excluded: they burn
-// the token budget on reasoning before emitting any JSON.
+// JSON-generation chain. Deliberately short (2 models) because each attempt
+// gets 50s and the whole request must fit under CF's ~100s inbound ceiling.
+// gpt-oss-120b:free is first because it's the one free model I've verified
+// can emit a full blueprint in ~20s — llama-3.3-70b is the safety net.
+// Longer chains just burn the wall-clock in timeouts and return 524 to the
+// client, which is worse than two good shots and an honest 503.
 const JSON_MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'google/gemma-4-31b-it:free',
-  'openai/gpt-oss-120b:free',
-  'google/gemma-3-27b-it:free',
-  'qwen/qwen3-next-80b-a3b-instruct:free',    // regex extracts JSON from prose
-  'z-ai/glm-4.5-air:free',                    // last-resort availability anchor
+  'openai/gpt-oss-120b:free',                 // verified fast on real blueprints
+  'meta-llama/llama-3.3-70b-instruct:free',   // predictable JSON discipline
 ];
 
 const MAX_MESSAGES = 12;
 const MAX_TOTAL_CHARS = 8000;
 const MAX_TOKENS_CHAT = 220;
-// JSON budget needs to fit a full blueprint: 5-7 steps × 3-5 bricks × ~110
-// chars/brick + step metadata. 450 was too small — Claude's blueprints kept
-// truncating mid-brick, throwing JSON parse errors and falling all the way
-// through to the local generator (which is what made the credit "feel" unused).
-const MAX_TOKENS_JSON = 2500;
+// A full blueprint is ~1200-1800 tokens (5-7 steps × 3-5 bricks with full
+// text fields). Keep the cap low enough that a model can't endlessly
+// ramble, but generous enough that real blueprints aren't truncated.
+const MAX_TOKENS_JSON = 1800;
 const PER_ATTEMPT_TIMEOUT_MS_CHAT = 10000; // short — falls through fast if throttled
-const PER_ATTEMPT_TIMEOUT_MS_JSON = 30000; // longer — JSON payloads take longer to generate
+// Free models generate ~25-40 tokens/sec. 1800 tokens = ~45-70s worst case.
+// 30s was too aggressive — complex prompts like "fish with wings" kept
+// aborting mid-generation, burning through the whole chain in 90s and
+// returning "all models unavailable" to the client. 50s gives the first
+// model enough time and two attempts fit under Cloudflare's ~100s inbound
+// wall-clock ceiling before the edge returns a 524.
+const PER_ATTEMPT_TIMEOUT_MS_JSON = 50000;
 // 402 = OpenRouter "insufficient credit" → skip to the next model in the
 // chain (usually a `:free` one) instead of failing the whole request.
 const RETRIABLE = new Set([402, 404, 408, 425, 429, 500, 502, 503, 504]);
