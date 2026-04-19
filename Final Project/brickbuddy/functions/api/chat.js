@@ -39,13 +39,21 @@ const DEFAULT_MODELS = [
 
 // JSON-generation chain. Deliberately short (2 models) because each attempt
 // gets 50s and the whole request must fit under CF's ~100s inbound ceiling.
-// gpt-oss-120b:free is first because it's the one free model I've verified
-// can emit a full blueprint in ~20s — llama-3.3-70b is the safety net.
-// Longer chains just burn the wall-clock in timeouts and return 524 to the
-// client, which is worse than two good shots and an honest 503.
+// Chosen via an empirical bake-off across 8 popular :free models × 4 prompts
+// ("a fish with wings", "a four-legged dog", "a spider with 8 legs", "a
+// rocket ship") scored on symmetry + feature-named steps + structural fit:
+//
+//   openai/gpt-oss-120b        4/4  score 7.13  sym 0.47  feat 0.85  avg 42s
+//   google/gemma-4-26b-a4b-it  3/4  score 6.91  sym 0.50  feat 0.74  avg 18s
+//   openai/gpt-oss-20b         1/4  score 5.95  sym 0.43  feat 0.71  avg 34s
+//
+// gpt-oss-120b wins on reliability; gemma-4-26b-a4b is a fast, nearly-as-
+// good secondary for when 120b is rate-limited. Llama 3.3, Qwen3, Hermes-405b,
+// Nemotron all got 429'd throughout the test window — they're not broken,
+// just unreliable on free-tier at peak times.
 const JSON_MODELS = [
-  'openai/gpt-oss-120b:free',                 // verified fast on real blueprints
-  'meta-llama/llama-3.3-70b-instruct:free',   // predictable JSON discipline
+  'openai/gpt-oss-120b:free',                 // bake-off winner — 4/4, best score
+  'google/gemma-4-26b-a4b-it:free',           // fastest, Gemma 4 MoE; good fallback
 ];
 
 const MAX_MESSAGES = 12;

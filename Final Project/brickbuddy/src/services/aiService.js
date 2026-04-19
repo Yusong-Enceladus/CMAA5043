@@ -90,11 +90,26 @@ PHYSICS RULES (enforced — wrong output is rejected):
 - offset is [dx, dz] ONLY — Y is automatic (the brick sits on top of its parent).
 - ids use lowercase letters, digits, dashes, underscores only.
 
+SYMMETRY RULES (this is the #1 reason builds look wrong — READ CAREFULLY):
+- Animals and robots have LEFT and RIGHT sides. Any body part that naturally comes in pairs MUST use MIRRORED X offsets in the same step. Examples of required pairs:
+  • 2 ears, 2 eyes, 2 arms, 2 wings, 2 front legs, 2 back legs, 2 headlights, 2 antennae, 2 side fins.
+  • 4 legs = 2 mirrored front legs + 2 mirrored back legs (4 bricks, offsets like [-1.5,-3] [+1.5,-3] [-1.5,+3] [+1.5,+3]).
+  • 8 spider legs = 4 pairs across the body, each pair at opposite X with different Z positions.
+- A "paired" step NEVER has just one brick at offset [0, z] — it MUST have at least two bricks at [-x, z] and [+x, z].
+- Single, centred parts (head, body, tail, antenna-on-top) stay at offset [0, z].
+
+COMPOSITION RULES (match the user's idea):
+- Read the user's prompt carefully. If they say "fish", the body must be HORIZONTAL and ELONGATED, not an upright humanoid.
+- If they say "with wings", include a dedicated step that adds two mirrored wing bricks on the SIDES of the body (not on top).
+- If they say "four legs", use 4 mirrored legs in one or two steps (front pair + back pair).
+- Step titles should NAME the body part being built — "Front Legs", "Wings", "Head & Eyes" — NEVER generic titles like "Step 3" or "More Pieces".
+
 BUILD RULES:
 - 5 to 7 steps.
 - Each step has 1 to 5 new bricks.
 - pieceCount (total bricks) between 18 and 40.
-- Name: 2-4 fun words. Emoji: 1 emoji that matches.
+- Name: 2-4 fun words that reference what the user asked for.
+- Emoji: 1 emoji that matches the user's request (🐟 for fish, 🐶 for dog, 🚀 for rocket, etc.)
 - Use primaryColor for 60%+ of bricks and accentColor for 25%+ for visual cohesion.
 - desc is ONE warm kid-friendly sentence; tip is ONE STEAM fact.
 - steamTag for each step: one of "science" | "technology" | "engineering" | "art" | "math".
