@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1600,initial-scale=1" />
+<title>BrickBuddy · Investor deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --ink:        #1A1410;
+    --ink-2:      #3A2C21;
+    --ink-3:      #6A5445;
+    --ink-4:      #A18E7E;
+    --paper:      #FFF6EC;
+    --paper-2:    #FDEAD5;
+    --paper-3:    #FFE0CC;
+    --card:       #FFFFFF;
+    --rule:       rgba(26, 20, 16, 0.08);
+    --rule-2:     rgba(26, 20, 16, 0.16);
+    --brick-red:    #E14F3B;
+    --brick-red-d:  #B2392A;
+    --brick-orange: #F59E0B;
+    --brick-yellow: #FBBF24;
+    --brick-green:  #10B981;
+    --brick-blue:   #3B82F6;
+    --brick-navy:   #1F2937;
+    --brick-gray:   #6B7280;
+    --live:       #2F6FEB;
+    --live-soft:  #DCE7FB;
+    --ok:         #0F9968;
+    --warn:       #E0701B;
+    --violet:     #8357E6;
+    --sans:  "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Fraunces", ui-serif, Georgia, serif;
+    --mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1600px; height: 900px;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--sans);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .deck { position: relative; width: 1600px; height: 900px; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    overflow: hidden;
+  }
+  .slide.active { display: block; }
+  .slide.active .anim { animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .slide.active .anim-1 { animation-delay: 0.08s; }
+  .slide.active .anim-2 { animation-delay: 0.22s; }
+  .slide.active .anim-3 { animation-delay: 0.36s; }
+  .slide.active .anim-4 { animation-delay: 0.50s; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(22px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+  }
+
+  /* ── Shared frame: top bar + footer brand strip on every slide ── */
+  .frame {
+    position: absolute; inset: 0;
+    padding: 58px 84px 70px;
+    display: flex; flex-direction: column;
+  }
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    font: 600 14px/1 var(--mono); letter-spacing: 0.18em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .logo-dot {
+    width: 14px; height: 14px; border-radius: 4px; background: var(--brick-red);
+    display: inline-block; margin-right: 10px; vertical-align: -2px;
+    box-shadow: 0 2px 0 var(--brick-red-d);
+  }
+  .foot {
+    position: absolute; bottom: 28px; left: 84px; right: 84px;
+    display: flex; align-items: center; justify-content: space-between;
+    font: 500 12px/1 var(--mono); letter-spacing: 0.22em;
+    color: var(--ink-4); text-transform: uppercase;
+  }
+  .pageno { font-variant-numeric: tabular-nums; }
+
+  /* ── Floating bricks (decorative, mirrors SplashScreen) ── */
+  .brick { position: absolute; border-radius: 7px; opacity: 0.9;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.12), 0 16px 32px rgba(0,0,0,0.06);
+    pointer-events: none;
+  }
+  .brick::before, .brick::after {
+    content: ""; position: absolute; top: -6px; width: 10px; height: 10px;
+    border-radius: 999px; background: inherit;
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.2);
+  }
+  .brick::before { left: 22%; }
+  .brick::after  { right: 22%; }
+
+  /* ──────────────────────────────── SLIDE 1 — HOOK ──────────────────── */
+  .s1 .frame { justify-content: center; }
+  .s1 .hero {
+    max-width: 1280px; margin: 0 auto; text-align: center;
+    display: flex; flex-direction: column; gap: 32px; align-items: center;
+  }
+  .s1 .kicker {
+    font: 700 14px/1 var(--mono); letter-spacing: 0.28em;
+    color: var(--brick-red); text-transform: uppercase;
+  }
+  .s1 h1 {
+    font-family: var(--serif); font-weight: 700; font-size: 104px; line-height: 1.02;
+    letter-spacing: -0.035em; color: var(--ink);
+  }
+  .s1 h1 .ink { color: var(--ink); }
+  .s1 h1 em { font-style: italic; font-weight: 500; color: var(--brick-red); }
+  .s1 .sub {
+    font-size: 26px; line-height: 1.45; max-width: 940px; color: var(--ink-2);
+    font-weight: 500;
+  }
+  .s1 .pill {
+    display: inline-flex; gap: 10px; align-items: center;
+    padding: 10px 18px; background: rgba(225,79,59,0.10);
+    border-radius: 999px; color: var(--brick-red);
+    font: 700 13px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .s1 .br-red    { top:  8%; left:  5%; width: 94px; height: 66px; background: var(--brick-red); transform: rotate(-8deg); }
+  .s1 .br-orange { top: 15%; right: 7%; width: 74px; height: 52px; background: var(--brick-orange); transform: rotate(12deg); }
+  .s1 .br-yellow { bottom: 24%; right: 8%; width: 66px; height: 46px; background: var(--brick-yellow); transform: rotate(-6deg); }
+  .s1 .br-blue   { bottom: 18%; left: 6%; width: 82px; height: 58px; background: var(--brick-blue); transform: rotate(14deg); }
+  .s1 .br-gray   { top: 44%; left: 2%; width: 50px; height: 34px; background: var(--brick-gray); transform: rotate(-18deg); opacity: 0.6; }
+
+  /* ──────────────────────────────── SLIDE 2 — THE GAP ───────────────── */
+  .s2 .frame { justify-content: center; gap: 28px; }
+  .s2 .grid {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 64px; align-items: center;
+    max-width: 1380px; margin: 0 auto; margin-top: 20px;
+  }
+  .s2 h1 {
+    font-family: var(--serif); font-weight: 700; font-size: 74px; line-height: 1.05;
+    letter-spacing: -0.03em; color: var(--ink); text-align: center; max-width: 1200px; margin: 0 auto;
+  }
+  .s2 h1 .red { color: var(--brick-red); }
+  .s2 .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 24px;
+    padding: 32px 32px 28px; box-shadow: 0 12px 40px rgba(26,20,16,0.06);
+  }
+  .s2 .card.old { transform: rotate(-1.2deg); }
+  .s2 .card.new { transform: rotate(1.4deg); }
+  .s2 .cap {
+    font: 700 12px/1 var(--mono); letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 14px;
+  }
+  .s2 .card h3 { font-family: var(--serif); font-size: 36px; line-height: 1.1; margin-bottom: 16px; }
+  .s2 .card ul { list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 18px; color: var(--ink-2); }
+  .s2 .card li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; }
+  .s2 .card.old li::before { content: "✕"; color: var(--warn); font-weight: 700; font-size: 18px; flex-shrink: 0; }
+  .s2 .card.new li::before { content: "✓"; color: var(--ok);   font-weight: 700; font-size: 18px; flex-shrink: 0; }
+  .s2 .arrow {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: var(--ink); color: var(--paper); display: grid; place-items: center;
+    font-size: 36px; box-shadow: 0 6px 0 var(--ink-2);
+  }
+
+  /* ──────────────────────────────── SLIDE 3 — THE PRODUCT ───────────── */
+  .s3 .frame { justify-content: center; align-items: center; }
+  .s3 .hero { display: grid; grid-template-columns: auto 1fr; gap: 70px; align-items: center; max-width: 1380px; }
+  .s3 .mascot {
+    width: 260px; height: 260px; border-radius: 48px;
+    background: var(--brick-orange); position: relative;
+    box-shadow: 0 12px 0 #C78108, 0 28px 60px rgba(245,158,11,0.35);
+  }
+  .s3 .mascot::before, .s3 .mascot::after {
+    content: ""; position: absolute; top: 70px; width: 42px; height: 42px;
+    border-radius: 50%; background: var(--ink);
+  }
+  .s3 .mascot::before { left: 70px; }
+  .s3 .mascot::after  { right: 70px; }
+  .s3 .mouth {
+    position: absolute; bottom: 68px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 42px; border-radius: 0 0 40px 40px;
+    background: var(--ink);
+  }
+  .s3 .antenna {
+    position: absolute; top: -36px; left: 50%; transform: translateX(-50%);
+    width: 8px; height: 36px; background: var(--ink);
+  }
+  .s3 .antenna::after {
+    content: ""; position: absolute; top: -14px; left: -8px;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--brick-red);
+  }
+  .s3 .kicker { font: 700 14px/1 var(--mono); letter-spacing: 0.28em; color: var(--brick-red); text-transform: uppercase; }
+  .s3 h1 {
+    font-family: var(--serif); font-size: 100px; line-height: 0.98; letter-spacing: -0.035em;
+    color: var(--ink); margin: 14px 0 22px;
+  }
+  .s3 h1 .accent { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s3 .tagline { font-size: 24px; line-height: 1.45; color: var(--ink-2); max-width: 760px; margin-bottom: 22px; font-weight: 500; }
+  .s3 .pipe {
+    display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .s3 .chip {
+    display: inline-flex; gap: 8px; align-items: center;
+    background: var(--card); border: 1px solid var(--rule);
+    padding: 10px 14px; border-radius: 999px;
+    font: 700 13px/1 var(--sans); color: var(--ink-2);
+    box-shadow: 0 2px 0 var(--rule-2);
+  }
+  .s3 .chip .dot { width: 10px; height: 10px; border-radius: 3px; }
+  .s3 .chip.scan  .dot { background: var(--brick-red); }
+  .s3 .chip.voice .dot { background: var(--live); }
+  .s3 .chip.tap   .dot { background: var(--brick-orange); }
+  .s3 .chip.live  .dot { background: var(--brick-green); }
+  .s3 .chip.steam .dot { background: var(--violet); }
+  .s3 .arrow { font-size: 16px; color: var(--ink-4); }
+
+  /* ──────────────────────────────── SLIDE 4 — TOUR PREVIEW (5 stages) ── */
+  .s4 .frame { justify-content: center; gap: 32px; }
+  .s4 h1 {
+    font-family: var(--serif); font-size: 80px; line-height: 1.02; letter-spacing: -0.035em;
+    color: var(--ink); text-align: center; max-width: 1400px; margin: 0 auto;
+  }
+  .s4 h1 .red { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s4 .sub { text-align: center; font-size: 21px; color: var(--ink-3); max-width: 1000px; margin: 0 auto; }
+  .s4 .thumbs {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px;
+    max-width: 1440px; margin: 0 auto;
+  }
+  .s4 .thumb {
+    border-radius: 18px; padding: 20px 18px; min-height: 280px;
+    position: relative; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 10px 30px rgba(26,20,16,0.06);
+  }
+  .s4 .thumb .num {
+    font: 800 11px/1 var(--mono); letter-spacing: 0.18em;
+    opacity: 0.6; text-transform: uppercase;
+  }
+  .s4 .thumb h4 {
+    font-family: var(--serif); font-size: 26px; line-height: 1.05; letter-spacing: -0.02em;
+  }
+  .s4 .thumb p { font-size: 14px; line-height: 1.4; }
+  .s4 .thumb .ic { font-size: 36px; margin-bottom: -2px; }
+
+  .s4 .t1 { background: #FFE0CC; }   /* discover */
+  .s4 .t2 { background: #FEE9CA; }   /* inventory */
+  .s4 .t3 { background: #FCE7F3; }   /* build (the showpiece — pink) */
+  .s4 .t4 { background: #E6F4F1; }   /* learn */
+  .s4 .t5 { background: #F0E6FA; }   /* celebrate */
+  .s4 .thumb .tag {
+    margin-top: auto; font: 700 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .s4 .t1 .tag { color: var(--brick-red); }
+  .s4 .t2 .tag { color: var(--brick-orange); }
+  .s4 .t3 .tag { color: #9D174D; }
+  .s4 .t4 .tag { color: var(--ok); }
+  .s4 .t5 .tag { color: var(--violet); }
+  /* Highlight the killer stage with a star ribbon */
+  .s4 .star {
+    position: absolute; top: -8px; right: -6px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--brick-red); color: #FFF;
+    font: 800 9px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(225,79,59,0.4);
+  }
+
+  /* ──────────────────────────────── SLIDE 5 — DESIGN DECISIONS ───────── */
+  .s5 .frame { justify-content: flex-start; }
+  .s5 h1 {
+    font-family: var(--serif); font-size: 72px; line-height: 1.02; letter-spacing: -0.03em;
+    color: var(--ink); margin-top: 12px; margin-bottom: 30px;
+  }
+  .s5 h1 .accent { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s5 .kicker { font: 700 13px/1 var(--mono); letter-spacing: 0.26em; color: var(--brick-red); text-transform: uppercase; }
+  .s5 .grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr);
+    gap: 20px; flex: 1;
+  }
+  .s5 .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 20px;
+    padding: 26px 26px 22px; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 4px 20px rgba(26,20,16,0.04);
+  }
+  .s5 .card .num {
+    font: 900 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--brick-red);
+  }
+  .s5 .card h3 {
+    font-family: var(--serif); font-size: 26px; line-height: 1.08; letter-spacing: -0.02em;
+  }
+  .s5 .card p { font-size: 15px; line-height: 1.45; color: var(--ink-3); }
+  .s5 .card .ic { font-size: 30px; margin-bottom: 2px; }
+
+  /* ──────────────────────────────── SLIDE 6 — TEAM + CLOSE ──────────── */
+  .s6 .frame { justify-content: center; }
+  .s6 .wrap { max-width: 1380px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
+  .s6 .kicker { font: 700 13px/1 var(--mono); letter-spacing: 0.28em; color: var(--brick-red); text-transform: uppercase; }
+  .s6 h1 {
+    font-family: var(--serif); font-size: 98px; line-height: 0.98; letter-spacing: -0.035em;
+    color: var(--ink); margin: 18px 0 24px;
+  }
+  .s6 h1 .red { color: var(--brick-red); }
+  .s6 .team { display: grid; gap: 18px; }
+  .s6 .member { display: flex; gap: 18px; align-items: flex-start; }
+  .s6 .avatar {
+    flex-shrink: 0; width: 78px; height: 78px; border-radius: 20px;
+    display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 32px;
+    color: #FFF; box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+  }
+  .s6 .m1 .avatar { background: var(--brick-red); box-shadow: 0 4px 0 var(--brick-red-d); }
+  .s6 .m2 .avatar { background: var(--brick-blue); box-shadow: 0 4px 0 #1E4FC4; }
+  .s6 .member .info h4 { font-family: var(--serif); font-size: 26px; line-height: 1.2; margin-bottom: 4px; }
+  .s6 .member .role { font: 700 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--ink-4); text-transform: uppercase; margin-bottom: 6px; }
+  .s6 .member p { font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+  .s6 .links { display: grid; gap: 12px; margin-top: 24px; }
+  .s6 .link {
+    display: inline-flex; gap: 14px; align-items: center;
+    padding: 14px 20px; border-radius: 14px;
+    background: var(--card); border: 1px solid var(--rule);
+    font: 600 14px/1 var(--sans); color: var(--ink);
+  }
+  .s6 .link .lbl { font: 700 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--ink-4); text-transform: uppercase; }
+  .s6 .link .val { font-family: var(--mono); color: var(--ink); }
+  .s6 .cta {
+    display: inline-flex; padding: 14px 24px; margin-top: 16px;
+    background: var(--brick-red); color: #FFF6EC;
+    border-radius: 999px; font: 800 15px/1 var(--sans); letter-spacing: 0.04em;
+    box-shadow: 0 6px 0 var(--brick-red-d);
+  }
+</style>
+
+<script>
+  // Slide routing: `?slide=N` or `#N` picks which slide is visible.
+  // build_video.py navigates with ?slide=<n> so each recording frame starts
+  // on the right deck, and we re-trigger entrance animations by toggling the
+  // .active class after a microtask.
+  function showSlide(n) {
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('slide-' + n);
+    if (!el) return;
+    void el.offsetWidth;     // force reflow so CSS animations restart
+    el.classList.add('active');
+  }
+  function pickSlide() {
+    const q = new URLSearchParams(location.search);
+    const n = q.get('slide') || (location.hash.slice(1) || '1');
+    showSlide(+n || 1);
+  }
+  window.addEventListener('DOMContentLoaded', pickSlide);
+  window.addEventListener('hashchange', pickSlide);
+</script>
+</head>
+
+<body>
+<div class="deck">
+
+  <!-- ══════════════════════════ SLIDE 1 — HOOK ══════════════════════════ -->
+  <section class="slide s1" id="slide-1">
+    <span class="brick br-red"></span>
+    <span class="brick br-orange"></span>
+    <span class="brick br-yellow"></span>
+    <span class="brick br-blue"></span>
+    <span class="brick br-gray"></span>
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>Investor Demo · 2026</div>
+      </div>
+      <div class="hero">
+        <div class="kicker anim anim-1">The problem</div>
+        <h1 class="anim anim-2">
+          A pile of bricks,<br/>
+          and no <em>idea</em>.
+        </h1>
+        <p class="sub anim anim-3">
+          Your six-year-old tips out a hundred shapes and colors. Twenty minutes later,
+          the booklet is upside-down and they're quietly frustrated. This is where most
+          LEGO sets go to die.
+        </p>
+        <span class="pill anim anim-4">· Most LEGO boxes are abandoned in 30 minutes ·</span>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">01 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 2 — GAP ══════════════════════════ -->
+  <section class="slide s2" id="slide-2">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The gap</div>
+      </div>
+      <h1 class="anim anim-1">
+        The booklet is <span class="red">one-way</span>.
+      </h1>
+      <div class="grid">
+        <div class="card old anim anim-2">
+          <div class="cap">The booklet</div>
+          <h3>Static paper</h3>
+          <ul>
+            <li>Can't see what bricks the kid actually has</li>
+            <li>Can't answer "why?"</li>
+            <li>Can't adapt when they want something different</li>
+            <li>Only shows one "correct" model</li>
+          </ul>
+        </div>
+        <div class="arrow anim anim-3">→</div>
+        <div class="card new anim anim-4">
+          <div class="cap">A patient tutor</div>
+          <h3>What kids need</h3>
+          <ul>
+            <li>Looks at the pile and recommends a build</li>
+            <li>Listens to "make it blue" and rewrites itself</li>
+            <li>Lets a tap recolor a single brick</li>
+            <li>Teaches STEAM through every step</li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">02 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 3 — PRODUCT ══════════════════════════ -->
+  <section class="slide s3" id="slide-3">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The product</div>
+      </div>
+      <div class="hero">
+        <div class="mascot anim anim-1">
+          <span class="antenna"></span>
+          <span class="mouth"></span>
+        </div>
+        <div>
+          <div class="kicker anim anim-2">Meet</div>
+          <h1 class="anim anim-2">Brick<span class="accent">Buddy</span>.</h1>
+          <p class="tagline anim anim-3">
+            An AI building companion for kids aged six to eight. Show it your pile, pick a build,
+            then change anything by voice or tap — the instruction manual rewrites itself in real time.
+          </p>
+          <div class="pipe anim anim-4">
+            <span class="chip scan"><span class="dot"></span>📷 Scan pile</span>
+            <span class="arrow">→</span>
+            <span class="chip voice"><span class="dot"></span>🎤 Voice mods</span>
+            <span class="arrow">→</span>
+            <span class="chip tap"><span class="dot"></span>✋ Tap a brick</span>
+            <span class="arrow">→</span>
+            <span class="chip live"><span class="dot"></span>📖 Live manual</span>
+            <span class="arrow">→</span>
+            <span class="chip steam"><span class="dot"></span>🧠 STEAM</span>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><div>FOR AGES 6–8 · WEB-BASED · ZERO INSTALL</div><div class="pageno">03 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 4 — TOUR (5 stages) ══════════════ -->
+  <section class="slide s4" id="slide-4">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The tour</div>
+      </div>
+      <h1 class="anim anim-1">Five screens, <span class="red">zero menus.</span></h1>
+      <p class="sub anim anim-2">
+        Discover what to build. Inventory the pile. Build it brick by brick. Learn from it.
+        Celebrate it. Same arc, every time — nothing else to remember.
+      </p>
+      <div class="thumbs">
+        <div class="thumb t1 anim anim-3">
+          <div class="ic">📷</div>
+          <div class="num">Stage 1</div>
+          <h4>Discover</h4>
+          <p>Camera-first. Scan the pile, tell Buddy out loud, or just browse — three doors, one flow.</p>
+          <div class="tag">· Camera · Voice ·</div>
+        </div>
+        <div class="thumb t2 anim anim-3">
+          <div class="ic">🧮</div>
+          <div class="num">Stage 2</div>
+          <h4>Inventory</h4>
+          <p>Animated scan reveals every brick by color and count, then ranks three matched builds.</p>
+          <div class="tag">· Scan · Recommend ·</div>
+        </div>
+        <div class="thumb t3 anim anim-3">
+          <span class="star">★ Showpiece</span>
+          <div class="ic">🔨</div>
+          <div class="num">Stage 3</div>
+          <h4>Build</h4>
+          <p>3D viewer + paper manual that rewrites itself when you say "make it blue" or tap a brick.</p>
+          <div class="tag">· 3D · Voice · Tap ·</div>
+        </div>
+        <div class="thumb t4 anim anim-4">
+          <div class="ic">🔬</div>
+          <div class="num">Stage 4</div>
+          <h4>Learn</h4>
+          <p>Five STEAM tabs grounded in what was just built, plus a quick two-question quiz.</p>
+          <div class="tag">· STEAM · Quiz ·</div>
+        </div>
+        <div class="thumb t5 anim anim-4">
+          <div class="ic">🏆</div>
+          <div class="num">Stage 5</div>
+          <h4>Celebrate</h4>
+          <p>Confetti, a 3D trophy, a build report, and a printable certificate for the fridge.</p>
+          <div class="tag">· Trophy · Cert ·</div>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">04 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 5 — DECISIONS ══════════════════════════ -->
+  <section class="slide s5" id="slide-5">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>Why it ships</div>
+      </div>
+      <div class="kicker anim anim-1">Six design decisions</div>
+      <h1 class="anim anim-1">The <span class="accent">moat</span> is the stack.</h1>
+      <div class="grid">
+        <div class="card anim anim-2">
+          <div class="ic">📖</div>
+          <div class="num">01 · LIVING MANUAL</div>
+          <h3>The manual rewrites itself</h3>
+          <p>Voice, tap, and structural mods all flow through one mutation engine. The 3D viewer and the printed manual update from the same source — never out of sync.</p>
+        </div>
+        <div class="card anim anim-2">
+          <div class="ic">⚡</div>
+          <div class="num">02 · LOCAL FIRST</div>
+          <h3>Deterministic on-device parser</h3>
+          <p>Every voice command and tap edit is parsed locally — no LLM round-trip. Zero stalls, zero offline failure, zero cost per session.</p>
+        </div>
+        <div class="card anim anim-3">
+          <div class="ic">🧩</div>
+          <div class="num">03 · DATA BRICKS</div>
+          <h3>Every brick is JSON</h3>
+          <p>Models are fully declarative. The same 3D pipeline renders the Robot Dog, a Robot Car, a Dino Bot, or whatever the child asks for tomorrow.</p>
+        </div>
+        <div class="card anim anim-3">
+          <div class="ic">🎯</div>
+          <div class="num">04 · REGION AWARE</div>
+          <h3>"Make the head purple"</h3>
+          <p>The parser knows aliases — head = snout = face — so the natural words a six-year-old uses just work. Voice scopes change to a region; tap scopes to one brick.</p>
+        </div>
+        <div class="card anim anim-4">
+          <div class="ic">🪶</div>
+          <div class="num">05 · ZERO INSTALL</div>
+          <h3>Single-page web app</h3>
+          <p>A URL, a webcam, a microphone. Works on a Chromebook, iPad, or any laptop. No App Store, no parent setup, deploys to Cloudflare's edge.</p>
+        </div>
+        <div class="card anim anim-4">
+          <div class="ic">👶</div>
+          <div class="num">06 · SIX-YEAR UX</div>
+          <h3>Tuned for small attention spans</h3>
+          <p>Big type, warm palette, always-visible primary action, no hidden menus. Every screen is single-finger reachable; every error is a friendly Buddy bubble.</p>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY · DESIGN</div><div class="pageno">05 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 6 — TEAM + CLOSE ══════════════════════════ -->
+  <section class="slide s6" id="slide-6">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The team · the ask</div>
+      </div>
+      <div class="wrap">
+        <div>
+          <div class="kicker anim anim-1">Built by</div>
+          <h1 class="anim anim-2">Two<br/>builders,<br/>one <span class="red">idea</span>.</h1>
+          <span class="cta anim anim-4">Try it live · brickbuddy.pages.dev →</span>
+        </div>
+        <div class="team">
+          <div class="member m1 anim anim-2">
+            <div class="avatar">Y</div>
+            <div class="info">
+              <h4>Yusong Huang</h4>
+              <div class="role">Full implementation · Materials</div>
+              <p>Engineered every screen, the 3D pipeline, the live mutation engine, the Cloudflare edge deploy, and produced this demo + poster + report.</p>
+            </div>
+          </div>
+          <div class="member m2 anim anim-3">
+            <div class="avatar">J</div>
+            <div class="info">
+              <h4>Jiayi Huang</h4>
+              <div class="role">Ideation · Materials</div>
+              <p>Brought the original BrickBuddy concept, the user research with children aged 6–8, and co-produced the demo materials and report.</p>
+            </div>
+          </div>
+          <div class="links anim anim-4">
+            <div class="link"><span class="lbl">Live</span><span class="val">brickbuddy.pages.dev</span></div>
+            <div class="link"><span class="lbl">Repo</span><span class="val">github.com/Yusong-Enceladus/CMAA5043</span></div>
+            <div class="link"><span class="lbl">Course</span><span class="val">CMAA5043 · Final Project · Spring 2026</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><div>THANK YOU FOR WATCHING</div><div class="pageno">06 / 06</div></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
