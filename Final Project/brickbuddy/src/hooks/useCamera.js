@@ -9,8 +9,17 @@
  *   - Each startCamera() call requests a fresh stream so the browser re-prompts for
  *     permission when "Allow once" has expired.
  *   - Cleans up on unmount so the browser's camera indicator turns off.
+ *
+ * Demo mode: when the URL has `?demo=1`, startCamera() generates a synthetic
+ * MediaStream from a canvas — a "fake brick pile" preview that pulses every
+ * 60ms. takePhoto() returns a still capture from that canvas. This keeps
+ * the viewfinder UI live in headless Chromium where getUserMedia is denied,
+ * so the demo recording shows the camera path working end-to-end.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
+
+const IS_DEMO_MODE = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('demo') === '1';
 
 const ERR_MAP = {
   NotAllowedError:       { code: 'denied',   message: 'Camera permission was blocked. Click the camera icon in your address bar, choose "Allow", then tap again.' },
@@ -93,6 +102,55 @@ export default function useCamera() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+    }
+
+    // Demo mode: synthesise a fake brick-pile MediaStream from a canvas.
+    // Headless Chromium denies getUserMedia, so without this the demo
+    // recording shows nothing but an "opening camera…" placeholder.
+    if (IS_DEMO_MODE) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640; canvas.height = 480;
+      const ctx = canvas.getContext('2d');
+      const colors = ['#E14F3B', '#3B82F6', '#FBBF24', '#10B981', '#F59E0B', '#8357E6', '#1F2937'];
+      const bricks = Array.from({ length: 14 }, () => ({
+        x: Math.random() * 540 + 50,
+        y: Math.random() * 380 + 50,
+        w: 50 + Math.random() * 30,
+        h: 30 + Math.random() * 14,
+        c: colors[(Math.random() * colors.length) | 0],
+        r: (Math.random() - 0.5) * 0.5,
+      }));
+      let raf;
+      const tick = () => {
+        // Soft sand-paper background gradient
+        const g = ctx.createRadialGradient(320, 240, 60, 320, 240, 360);
+        g.addColorStop(0, '#FBE6CA'); g.addColorStop(1, '#E5BC8A');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 480);
+        // Bricks with a subtle bob
+        const t = performance.now() / 1000;
+        for (const b of bricks) {
+          ctx.save();
+          ctx.translate(b.x + b.w / 2, b.y + b.h / 2 + Math.sin(t + b.r * 5) * 1.2);
+          ctx.rotate(b.r);
+          ctx.fillStyle = 'rgba(0,0,0,0.18)';
+          ctx.fillRect(-b.w / 2 + 2, -b.h / 2 + 4, b.w, b.h);
+          ctx.fillStyle = b.c;
+          ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+          ctx.restore();
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+      const stream = canvas.captureStream(30);
+      // Attach a stop hook so cleanup cancels the animation.
+      stream.getVideoTracks()[0].addEventListener('ended', () => cancelAnimationFrame(raf));
+      const origStop = stream.getVideoTracks()[0].stop.bind(stream.getVideoTracks()[0]);
+      stream.getVideoTracks()[0].stop = () => { cancelAnimationFrame(raf); origStop(); };
+      streamRef.current = stream;
+      setIsActive(true);
+      setPermission('granted');
+      setIsStarting(false);
+      return stream;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {

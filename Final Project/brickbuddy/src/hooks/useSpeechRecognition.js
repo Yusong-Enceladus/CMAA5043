@@ -5,12 +5,24 @@
  * SpeechRecognition instance so the browser re-asks for mic permission when
  * the previous grant has expired. Surfaces permission denial to the UI
  * instead of failing silently.
+ *
+ * Demo mode: when the URL has `?demo=1`, the hook also installs a mock on
+ * `window.__bbVoiceMock__.simulate(text, durationMs)` that streams a fake
+ * transcript word-by-word into the listening UI — used by the investor-demo
+ * autopilot to make voice input look real in headless Chromium where Web
+ * Speech doesn't run. The mock writes through the same `setTranscript` /
+ * `setIsListening` setters as the real path, so the rest of the app sees
+ * an identical state machine.
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-const IS_SUPPORTED =
+const IS_DEMO_MODE = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('demo') === '1';
+
+const IS_SUPPORTED = IS_DEMO_MODE || (
   typeof window !== 'undefined' &&
-  ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+);
 
 const ERROR_MESSAGES = {
   'not-allowed':         'Microphone permission was blocked. Enable it in your browser, then tap again.',
@@ -128,6 +140,41 @@ export default function useSpeechRecognition() {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
+  }, []);
+
+  // Demo mode mock: streams a fake transcript word-by-word so the listening
+  // UI actually animates during recording. Exposed on window so the
+  // Playwright autopilot can call it. Each mounted hook re-installs the
+  // mock — the most recently mounted screen wins, which is fine because
+  // only one screen is active at a time.
+  useEffect(() => {
+    if (!IS_DEMO_MODE) return;
+    window.__bbVoiceMock__ = {
+      async simulate(text, durationMs = 2400) {
+        setError(null);
+        setTranscript('');
+        setIsListening(true);
+        const words = text.split(/\s+/).filter(Boolean);
+        const stepMs = Math.max(60, durationMs / Math.max(1, words.length));
+        for (let i = 0; i < words.length; i++) {
+          await new Promise((r) => setTimeout(r, stepMs));
+          setTranscript(words.slice(0, i + 1).join(' '));
+        }
+        // Hold the final transcript briefly so the viewer can read it,
+        // then release isListening so caller logic (e.g. handleVoiceCommand
+        // useEffect) fires.
+        await new Promise((r) => setTimeout(r, 320));
+        setIsListening(false);
+      },
+      reset() {
+        setTranscript('');
+        setIsListening(false);
+        setError(null);
+      },
+    };
+    return () => {
+      delete window.__bbVoiceMock__;
+    };
   }, []);
 
   return {

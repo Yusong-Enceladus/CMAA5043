@@ -112,13 +112,34 @@ export default function BuildScreen() {
      investor-demo recorder. Always on in dev; in production it only opens
      when the URL has `?demo=1`, which the demo's Playwright script appends.
      The hooks are pure UI dispatch (no privileged data), so leaving them
-     reachable behind a URL flag is fine for a public deploy. ─────── */
+     reachable behind a URL flag is fine for a public deploy.
+
+     - voice(text)       — fire the mutation directly (fast path, no UI
+                           feedback). Used for verification.
+     - speak(text, ms)   — simulate the FULL voice flow: mic active, transcript
+                           streams in word-by-word, then the mutation fires.
+                           This is what the autopilot actually drives so the
+                           demo recording shows the listening UI animate.
+     - tap(...)          — same as before. ─────── */
   useEffect(() => {
     const demoFlag = typeof window !== 'undefined'
       && new URLSearchParams(window.location.search).get('demo') === '1';
     if (!import.meta.env.DEV && !demoFlag) return;
     window.__bb__ = {
       voice: (text) => handleVoiceCommand(text),
+      speak: async (text, durationMs = 2400) => {
+        // Show listening state, stream the transcript, then let the existing
+        // useEffect (the lastListening → !isListening transition) fire the
+        // mutation. We use the speech mock installed by useSpeechRecognition.
+        if (!window.__bbVoiceMock__) {
+          // Fallback: just fire the mutation directly.
+          handleVoiceCommand(text);
+          return;
+        }
+        flashBuddy("I'm listening — tell me what to change!", 'listen');
+        await window.__bbVoiceMock__.simulate(text, durationMs);
+        // The transcript-dispatch useEffect picks it up from here.
+      },
       tap:   (partFilter, color) => {
         const part = (selectedModel?.steps || [])
           .flatMap((s) => s.newParts || [])

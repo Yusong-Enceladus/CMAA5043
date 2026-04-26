@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-BrickBuddy investor demo — master orchestrator.
+BrickBuddy investor demo — master orchestrator (iteration 3).
 
 Pipeline:
-  1. Generate per-segment TTS narration (macOS `say` · Samantha @ 140 wpm).
-     Swap TTS_VOICE/TTS_RATE + say_to_wav() for ElevenLabs when we have a key.
-  2. Start a local HTTP server for the slide deck on 9011. The BrickBuddy
-     dev server is expected to already be running on 5183 (`npm run dev`
-     from Final Project/brickbuddy, one terminal over).
-  3. For each segment, drive the right target with Playwright and record a
-     video at the narration's duration plus a small tail hold.
-  4. Mux audio + video per segment, trim the pre-load padding, crossfade
-     caption on / off.
-  5. Concat all per-segment MP4s into the final output.
+  1. TTS — one call per slide (sentence-level), one BIG call for the
+     continuous prototype scene (so Bronya's prosody flows across the
+     whole walk-through instead of stuttering every period).
+  2. Slides — one Playwright recording per slide (same as before).
+  3. Prototype — ONE long Playwright session that drives the whole app
+     end-to-end via the autopilot choreography. No reloads. The speech
+     and camera hooks are mocked at `?demo=1` so the listening UI
+     animates and the camera shows a synthesized brick-pile preview.
+  4. SRT — generate burned-in subtitles, with timestamps interpolated
+     across each scene's narration lines.
+  5. Concat + burn subs — final mp4 with audio + visuals + captions.
 
 Output:
   ../BrickBuddy_investor_demo.mp4   (relative to this script)
@@ -49,51 +50,45 @@ AUDIO_DIR = ROOT / "audio"
 VIDEO_DIR = ROOT / "video"
 TMP_DIR = ROOT / "tmp"
 FINAL = ROOT.parent / "BrickBuddy_investor_demo.mp4"
+SRT_PATH = ROOT.parent / "BrickBuddy_investor_demo.srt"
 
 for d in (AUDIO_DIR, VIDEO_DIR, TMP_DIR):
     d.mkdir(exist_ok=True, parents=True)
 
-# Homebrew's ffmpeg ships libx264; miniconda's ffmpeg does not. Prefer brew's
-# toolchain when present so the encoder string in mux() stays consistent.
 _BREW_FFMPEG = "/opt/homebrew/bin/ffmpeg"
 _BREW_FFPROBE = "/opt/homebrew/bin/ffprobe"
 FFMPEG = _BREW_FFMPEG if pathlib.Path(_BREW_FFMPEG).exists() else "ffmpeg"
 FFPROBE = _BREW_FFPROBE if pathlib.Path(_BREW_FFPROBE).exists() else "ffprobe"
 
+# Homebrew's ffmpeg doesn't ship --enable-libass, so the `subtitles` filter
+# is missing. Conda's ffmpeg has libfreetype + drawtext but no libx264,
+# so it can't be the primary encoder. We use both: brew for libx264
+# (slide + proto encoding) and conda for the drawtext caption overlay.
+_CONDA_FFMPEG = "/opt/miniconda3/bin/ffmpeg"
+FFMPEG_DRAW = _CONDA_FFMPEG if pathlib.Path(_CONDA_FFMPEG).exists() else FFMPEG
+
+# A short, ASCII-only path so the caption renderer's filtergraph stays
+# clean (the build dir has spaces in it which trip up libavfilter).
+SUB_STAGE = pathlib.Path("/tmp/bb_burn")
+SUB_STAGE.mkdir(exist_ok=True)
+
 # ---------------------------------------------------------------- config ---
 VIEWPORT = (1600, 900)
 FPS = 30
 PAD_SLIDE = 1.2   # sec of dead time to trim off the front of slide recordings
-PAD_PROTO = 2.2   # React + HMR needs a bit more time to paint
+PAD_PROTO = 1.6   # React first paint
 TAIL_HOLD = 0.80  # extra video hold after narration so scenes breathe
 HEAD_HOLD = 0.40  # pre-roll silence before narration starts
 
-# ── TTS pipeline ────────────────────────────────────────────────────────
-# Primary: myTTS — local Qwen3-TTS voice cloning of "Bronya" via the
-# MLX install at ~/Desktop/Creation/myTTS. Produces a much warmer, more
-# confident delivery than macOS `say` (Samantha). The pre-recorded
-# reference voice is in voices/bronya.wav.
-#
-# Fallback: macOS `say` Samantha @ 140 wpm. Only used if myTTS isn't
-# reachable (no install, missing venv) so the build never hard-fails.
 MYTTS_DIR    = pathlib.Path("/Users/bronya/Desktop/Creation/myTTS")
 MYTTS_PYTHON = MYTTS_DIR / "qwen3tts" / ".venv" / "bin" / "python"
 MYTTS_VOICE  = "bronya"
-SAY_VOICE = "Samantha"  # fallback only
-SAY_RATE  = 140         # fallback only
-SENTENCE_PAUSE = 380    # ms [[slnc N]] — only used by the `say` fallback
+SAY_VOICE = "Samantha"
+SAY_RATE  = 140
+SENTENCE_PAUSE = 380
+
 PORT_SLIDES = 9011
-# Record against the PRODUCTION bundle (served from ../../dist) rather than
-# the Vite dev server. Vite HMR does weird things to R3F's zustand store in
-# Playwright's headless Chromium; the built bundle is fully static and works.
-#
-# Prereqs (one-off):
-#   cd "Final Project/brickbuddy" && npm run build
-# The script will serve dist/ on PORT_PROTO automatically.
 PORT_PROTO = 5184
-# `?demo=1` opens the demo-only window hooks (`__bb__.voice`, `__bbDev__.*`)
-# in the production bundle. Without it the hooks stay invisible to the
-# public deploy. See BuildScreen.jsx + BuildContext.jsx for the gate.
 PROTO_URL = f"http://127.0.0.1:{PORT_PROTO}/?demo=1"
 DIST_DIR = ROOT.parent.parent.parent / "dist"
 
@@ -112,18 +107,14 @@ def probe_duration(path):
     return float(json.loads(r.stdout)["format"]["duration"])
 
 
+# ---------------------------------------------------------------- TTS ---
 def prep_say_text(text):
-    """Insert [[slnc N]] pauses between sentences so Samantha breathes.
-    Only used by the `say` fallback path."""
     parts = re.split(r'(?<=[.!?])\s+', text.strip())
     pause = f"[[slnc {SENTENCE_PAUSE}]]"
     return f" {pause} ".join(p for p in parts if p)
 
 
 def _prepend_silence(src_wav, dst_wav, silence_s):
-    """Prepend `silence_s` of digital silence to src_wav → dst_wav.
-    Used by both TTS paths so the narration always has the same lead-in,
-    regardless of which engine produced the audio."""
     sh([FFMPEG, "-y", "-loglevel", "error",
         "-f", "lavfi", "-t", f"{silence_s:.3f}", "-i", "anullsrc=r=44100:cl=stereo",
         "-i", str(src_wav),
@@ -132,12 +123,6 @@ def _prepend_silence(src_wav, dst_wav, silence_s):
 
 
 def _mytts_to_wav(text, wav_path):
-    """Render narration via myTTS (Qwen3-TTS Bronya voice).
-
-    Calls the MLX-backed CLI at ~/Desktop/Creation/myTTS. The output is
-    already loudness-normalized + edge-faded by myTTS's post-processing
-    pipeline, so we just prepend HEAD_HOLD silence to match `say`'s timing.
-    """
     raw = wav_path.with_suffix(".raw.wav")
     cmd = [
         str(MYTTS_PYTHON), "generate.py",
@@ -151,7 +136,6 @@ def _mytts_to_wav(text, wav_path):
 
 
 def _say_to_wav(text, wav_path):
-    """Fallback: macOS `say`. Only invoked when myTTS isn't reachable."""
     aiff = wav_path.with_suffix(".aiff")
     tts_text = prep_say_text(text)
     subprocess.run(
@@ -164,7 +148,13 @@ def _say_to_wav(text, wav_path):
 
 def say_to_wav(text, wav_path):
     """Render narration to a WAV using the best available TTS engine.
-    myTTS Bronya is preferred; macOS `say` is the fallback."""
+
+    For the proto autopilot we hand the entire walk-through narration as
+    ONE long string. Qwen3-TTS handles multi-sentence input gracefully —
+    you get natural prosodic continuity across the whole scene rather
+    than the per-sentence cuts you'd get from concatenating individual
+    calls. macOS `say` (the fallback) also handles long text in one go.
+    """
     if MYTTS_PYTHON.exists() and MYTTS_DIR.exists():
         try:
             _mytts_to_wav(text, wav_path)
@@ -174,6 +164,19 @@ def say_to_wav(text, wav_path):
     _say_to_wav(text, wav_path)
 
 
+def segment_text(seg):
+    """Return the text fed to TTS for a segment."""
+    if seg["kind"] == "slide":
+        return seg["text"]
+    if seg["kind"] == "autopilot":
+        # Join all narration lines into a single TTS call so Bronya's
+        # prosody flows across the whole scene. A single space between
+        # sentences keeps the natural breath.
+        return " ".join(seg["narration_lines"])
+    raise RuntimeError(f"unknown kind: {seg['kind']}")
+
+
+# ---------------------------------------------------------------- HTTP servers ---
 def start_server(dir_, port):
     class H(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *a, **k):
@@ -195,95 +198,337 @@ def start_server(dir_, port):
     time.sleep(0.4)
 
 
-# ------------------------------------------------------ caption injection ---
-CAPTION_CSS = """
-  #__caption {
-    position: fixed !important; left: 50% !important; bottom: 28px !important;
-    transform: translateX(-50%) translateZ(0) !important;
-    will-change: transform; isolation: isolate;
-    padding: 14px 32px;
-    background: rgba(26,20,16,0.94);
-    border: 1px solid rgba(225,79,59,0.42);
-    border-radius: 999px;
-    font: 600 13px/1.4 "JetBrains Mono", ui-monospace, monospace;
-    letter-spacing: .26em; color: #FFF6EC; text-transform: uppercase;
-    z-index: 2147483647 !important;
-    box-shadow: 0 20px 60px rgba(0,0,0,.55),
-                0 0 0 1px rgba(225,79,59,0.18),
-                0 0 32px -8px rgba(225,79,59,0.35);
-    animation: __capin .30s cubic-bezier(.2,.8,.2,1);
-  }
-  @keyframes __capin {
-    from { opacity: 0; transform: translateX(-50%) translateZ(0) translateY(8px); }
-    to   { opacity: 1; transform: translateX(-50%) translateZ(0); }
-  }
-"""
-
-def inject_caption_css(page):
-    page.evaluate(f"""
-      (() => {{
-        if (document.getElementById('__caption_style')) return;
-        const s = document.createElement('style');
-        s.id = '__caption_style';
-        s.textContent = {json.dumps(CAPTION_CSS)};
-        document.head.appendChild(s);
-      }})();
-    """)
-
-def set_caption(page, text):
-    inject_caption_css(page)
-    page.evaluate("""
-      (txt) => {
-        let el = document.getElementById('__caption');
-        if (!el) {
-          el = document.createElement('div');
-          el.id = '__caption';
-          document.body.appendChild(el);
-        }
-        el.textContent = txt;
-      }
-    """, text or "")
+# ---------------------------------------------------------------- slide recording ---
+def record_slide(seg, browser, narration_s):
+    ctx = browser.new_context(
+        viewport={"width": VIEWPORT[0], "height": VIEWPORT[1]},
+        device_scale_factor=1,
+        record_video_dir=str(TMP_DIR),
+        record_video_size={"width": VIEWPORT[0], "height": VIEWPORT[1]},
+    )
+    page = ctx.new_page()
+    slide_url = f"http://127.0.0.1:{PORT_SLIDES}/slides.html?slide={seg['slide']}"
+    page.goto(slide_url, wait_until="domcontentloaded")
+    page.wait_for_timeout(int(PAD_SLIDE * 1000))
+    page.wait_for_timeout(int((narration_s + TAIL_HOLD) * 1000))
+    vid = page.video
+    ctx.close()
+    return pathlib.Path(vid.path()), PAD_SLIDE
 
 
-def clear_caption(page):
-    page.evaluate("""
-      () => {
-        const el = document.getElementById('__caption');
-        if (el) el.remove();
-      }
-    """)
+# ---------------------------------------------------------------- autopilot ---
+def _click_text(page, text):
+    page.evaluate(
+        """(txt) => {
+            const all = [...document.querySelectorAll('button, [role="button"]')];
+            const btn = all.find(b => b.textContent.trim().includes(txt));
+            if (btn) btn.click();
+        }""",
+        text,
+    )
 
 
-# ---------------------------------------------------- view state seeding ---
-# Two flavours of stage:
-#   - PRE-BUILD stages (splash/discover/inventory_*) need NO selected model
-#     and NO localStorage seeding. We hard-clear storage, navigate to the
-#     route, then drive the UI through the demo `__bbDev__` hooks to land
-#     on exactly the stage we want.
-#   - BUILD/LEARN/CELEBRATE need a selected model. Seed via __bbDev__ which
-#     uses the React state setters directly (no localStorage round-trip),
-#     so the page paints in one frame.
-#
-# Inventory has two sub-views because the screen morphs:
-#   - inventory_fresh    — scan animation playing (use this for S09)
-#   - inventory_results  — scan complete, recommendations visible (use for S10)
-VIEW_STATE = {
-    "splash":             {"stage": "splash",    "model": None,  "step": 0, "wait_inventory": False, "wait_for": None},
-    "discover":           {"stage": "discover",  "model": None,  "step": 0, "wait_inventory": False, "wait_for": None},
-    "inventory_fresh":    {"stage": "inventory", "model": None,  "step": 0, "wait_inventory": True,  "wait_for": "scan"},
-    "inventory_results":  {"stage": "inventory", "model": None,  "step": 0, "wait_inventory": True,  "wait_for": "results"},
-    "build_step0":        {"stage": "build",     "model": "dog", "step": 0, "wait_inventory": False, "wait_for": None},
-    "build_step3":        {"stage": "build",     "model": "dog", "step": 3, "wait_inventory": False, "wait_for": None},
-    "build_step5":        {"stage": "build",     "model": "dog", "step": 5, "wait_inventory": False, "wait_for": None},
-    "build_step6":        {"stage": "build",     "model": "dog", "step": 6, "wait_inventory": False, "wait_for": None},
-    "build_step7":        {"stage": "build",     "model": "dog", "step": 7, "wait_inventory": False, "wait_for": None},
-    "learn":              {"stage": "learn",     "model": "dog", "step": 7, "wait_inventory": False, "wait_for": None},
-    "celebrate":          {"stage": "celebrate", "model": "dog", "step": 7, "wait_inventory": False, "wait_for": None},
-}
+def record_autopilot(seg, browser, narration_s):
+    """Drive the prototype through the segment's `actions` schedule.
 
-# Seeded inventory matches data/mockInventory.js so InventoryScreen renders
-# the recommendations immediately (no Discover round-trip). Counts only;
-# the screen reads `bricks` and `total` from this object.
+    ONE persistent browser context for the entire scene. No reloads. The
+    speech + camera hooks are mocked (see useSpeechRecognition.js /
+    useCamera.js); the autopilot calls window.__bb__.speak(...) so the
+    listening UI streams the transcript word-by-word, then the existing
+    React useEffect fires the mutation. Result: the recording shows a
+    coherent, end-to-end product walk-through.
+    """
+    duration = max(narration_s + TAIL_HOLD, seg.get("duration_s") or narration_s + TAIL_HOLD)
+
+    ctx = browser.new_context(
+        viewport={"width": VIEWPORT[0], "height": VIEWPORT[1]},
+        device_scale_factor=1,
+        record_video_dir=str(TMP_DIR),
+        record_video_size={"width": VIEWPORT[0], "height": VIEWPORT[1]},
+        permissions=["microphone", "camera"],
+    )
+    page = ctx.new_page()
+    page.goto(PROTO_URL, wait_until="domcontentloaded")
+    page.wait_for_function("() => !!window.__bbDev__", timeout=8000)
+    # Seed the inventory ahead of time — the autopilot navigates through
+    # Discover via 'Just browse', which expects an inventory to exist on
+    # the BuildContext.
+    page.evaluate(
+        "(inv) => { window.__bbDev__.setInventory(inv); }",
+        _INVENTORY_SEED,
+    )
+    page.wait_for_timeout(int(PAD_PROTO * 1000))
+
+    actions = seg["actions"]
+    start = time.time()
+
+    def _now():
+        return time.time() - start
+
+    def _wait_until(t):
+        gap = t - _now()
+        if gap > 0:
+            page.wait_for_timeout(int(gap * 1000))
+
+    for action in actions:
+        offset, kind, *args = action
+        _wait_until(offset)
+        try:
+            if kind == "noop":
+                pass
+            elif kind == "click_text":
+                _click_text(page, args[0])
+            elif kind == "set_stage":
+                page.evaluate(f"() => window.__bbDev__.setStage({json.dumps(args[0])})")
+            elif kind == "select_model":
+                page.evaluate(f"() => window.__bbDev__.selectModel({json.dumps(args[0])})")
+            elif kind == "set_inventory":
+                page.evaluate(
+                    "(inv) => { window.__bbDev__.setInventory(inv); }",
+                    args[0],
+                )
+            elif kind == "speak":
+                text, dur_ms = args[0], args[1] if len(args) > 1 else 2400
+                # Fire-and-forget — speak returns a promise, but we want
+                # the autopilot to advance so the next action can land
+                # while the transcript is still streaming. The mutation
+                # itself fires when speech.isListening flips false.
+                page.evaluate(
+                    "([t, d]) => { (async () => { try { await window.__bb__.speak(t, d); } catch (e) {} })(); }",
+                    [text, dur_ms],
+                )
+            elif kind == "speak_mock":
+                # Same pattern as `speak`, but drives the speech mock
+                # directly without going through BuildScreen. Used on the
+                # Discover screen where we want the listening UI to
+                # animate but no mutation should fire (we'll cancel out
+                # of the voice card after).
+                text, dur_ms = args[0], args[1] if len(args) > 1 else 2200
+                page.evaluate(
+                    "([t, d]) => { (async () => { try { if (window.__bbVoiceMock__) await window.__bbVoiceMock__.simulate(t, d); } catch (e) {} })(); }",
+                    [text, dur_ms],
+                )
+            elif kind == "eval_tap":
+                page.evaluate(
+                    "([f, c]) => window.__bb__ && window.__bb__.tap(f, c)",
+                    [args[0], args[1]],
+                )
+            elif kind == "eval":
+                page.evaluate(args[0])
+            else:
+                print(f"     [unknown action] {kind!r}")
+        except Exception as e:
+            print(f"     [action miss] {kind} {args}: {e}")
+
+    # Hold until the full duration to give late actions room to settle.
+    _wait_until(duration)
+
+    vid = page.video
+    ctx.close()
+    return pathlib.Path(vid.path()), PAD_PROTO
+
+
+# ---------------------------------------------------------------- mux ---
+def mux(raw_video, wav, pad_s, narration_s, out_path, hold_s=None):
+    """Trim the pre-load padding and mux audio over video.
+
+    `hold_s`, if given, is the total visual duration we want — used by the
+    autopilot scene where the visual choreography may run longer than the
+    narration audio (so the demo doesn't cut to black mid-action).
+    """
+    audio_total = narration_s + HEAD_HOLD + TAIL_HOLD
+    target = max(audio_total, hold_s or audio_total)
+    cmd = [
+        FFMPEG, "-y", "-loglevel", "error",
+        "-ss", f"{pad_s:.3f}", "-i", str(raw_video),
+        "-i", str(wav),
+        "-t", f"{target:.3f}",
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "192k",
+        # Pad the audio with silence so it covers the full visual hold.
+        "-af", f"apad=whole_dur={target:.3f}",
+        "-r", str(FPS), "-vsync", "cfr",
+        str(out_path),
+    ]
+    sh(cmd)
+
+
+# ---------------------------------------------------------------- subtitles (SRT) ---
+def _split_into_subtitle_lines(text, max_chars=78):
+    """Break a sentence into ≤max_chars chunks at word boundaries for SRT."""
+    words = text.split()
+    lines, cur = [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_chars:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = (cur + " " + w).strip() if cur else w
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _srt_timestamp(t_s):
+    h = int(t_s // 3600); m = int((t_s % 3600) // 60); s = t_s - 60 * (h * 60 + m)
+    return f"{h:02d}:{m:02d}:{s:06.3f}".replace(".", ",")
+
+
+def _seg_subtitle_lines(seg, narration_s):
+    """Return [(start_s, end_s, text), ...] within this segment's local timeline.
+
+    For slides: split the slide's `text` into one or two SRT lines and
+    spread them across the narration. For autopilot scenes: each entry
+    in `narration_lines` becomes one SRT block, with timestamps
+    interpolated by word-share.
+    """
+    lines = []
+    if seg["kind"] == "slide":
+        chunks = _split_into_subtitle_lines(seg["text"], max_chars=86)
+    else:
+        chunks = list(seg["narration_lines"])
+    word_counts = [max(1, len(c.split())) for c in chunks]
+    total_w = sum(word_counts)
+    # Spread chunks proportionally across narration_s. Add a tiny gap at
+    # start (HEAD_HOLD) so subs don't appear before the audio.
+    cursor = HEAD_HOLD
+    avail = narration_s
+    for c, wc in zip(chunks, word_counts):
+        share = wc / total_w
+        dur = avail * share
+        end = cursor + dur
+        lines.append((cursor, end, c))
+        cursor = end
+    return lines
+
+
+def write_srt(seg_offsets, segments, srt_path):
+    """seg_offsets: list of (segment_id, start_in_final_s, audio_dur_s)."""
+    entries = []  # global-timeline (start, end, text)
+    seg_by_id = {s["id"]: s for s in segments}
+    for sid, base, narr_s in seg_offsets:
+        seg = seg_by_id[sid]
+        for (lstart, lend, text) in _seg_subtitle_lines(seg, narr_s):
+            entries.append((base + lstart, base + lend, text))
+    # Write SRT
+    with open(srt_path, "w", encoding="utf-8") as f:
+        for i, (s, e, t) in enumerate(entries, start=1):
+            f.write(f"{i}\n{_srt_timestamp(s)} --> {_srt_timestamp(e)}\n{t}\n\n")
+    return srt_path
+
+
+# ---------------------------------------------------------------- concat + burn ---
+def _parse_srt(srt_path):
+    """Return [(start_s, end_s, text), ...] from an SRT file."""
+    raw = srt_path.read_text(encoding="utf-8").strip()
+    out = []
+    for block in re.split(r"\n\s*\n", raw):
+        lines = block.strip().splitlines()
+        if len(lines) < 3:
+            continue
+        # lines[0] = index, lines[1] = "HH:MM:SS,mmm --> HH:MM:SS,mmm"
+        m = re.match(r"(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})", lines[1])
+        if not m:
+            continue
+        h1, m1, s1, ms1, h2, m2, s2, ms2 = (int(x) for x in m.groups())
+        start = h1*3600 + m1*60 + s1 + ms1/1000.0
+        end   = h2*3600 + m2*60 + s2 + ms2/1000.0
+        text  = " ".join(lines[2:]).strip()
+        out.append((start, end, text))
+    return out
+
+
+def _drawtext_chain(srt_entries):
+    """Build a comma-separated chain of `drawtext` filters that show each
+    SRT entry inside its time window. Each filter is fully self-contained;
+    the chain is wrapped in a single `-vf`.
+
+    Caption style: warm cream text over a soft dark pill, centered ~70px
+    from the bottom edge. Uses the system Helvetica.ttc; falls back to a
+    generic sans if missing.
+    """
+    # Pick a font that ships on macOS and has a sensible regular weight.
+    # ttc files index multiple weights; we point fontconfig at the file
+    # and let it pick the regular face.
+    candidates = [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ]
+    fontfile = next((p for p in candidates if pathlib.Path(p).exists()), candidates[-1])
+
+    parts = []
+    for (start, end, text) in srt_entries:
+        # ffmpeg drawtext escaping: backslash for : ' \ % {
+        # We use the single-line form `text=...` so quote-escape the text.
+        safe = (text
+                .replace("\\", "\\\\")
+                .replace("'", "’")  # turn apostrophes into curly so we
+                                          # never have to escape them
+                .replace(":", r"\:")
+                .replace(",", r"\,")
+                .replace("[", r"\[")
+                .replace("]", r"\]"))
+        f = (
+            f"drawtext=fontfile='{fontfile}'"
+            f":text='{safe}'"
+            f":fontsize=26:fontcolor=#FFF6EC"
+            f":box=1:boxcolor=#1A1410@0.78:boxborderw=14"
+            f":x=(w-text_w)/2:y=h-text_h-72"
+            f":enable='between(t\\,{start:.3f}\\,{end:.3f})'"
+        )
+        parts.append(f)
+    return ",".join(parts) if parts else "null"
+
+
+def concat_and_burn(segments_mp4s, srt_path, out_path):
+    """Concat per-segment mp4s into one file, then burn captions via the
+    drawtext filter chain.
+
+    Two passes:
+      1. Concat the per-segment H.264 mp4s without re-encode.
+      2. Pipe through conda's ffmpeg (which has libfreetype/drawtext)
+         and use its `libopenh264` encoder for the burn pass — Homebrew
+         ffmpeg has libx264 but not libfreetype; conda has libfreetype
+         but not libx264. libopenh264 is good enough for a demo at CRF
+         the equivalent of x264 q=20.
+    """
+    listfile = TMP_DIR / "concat.txt"
+    listfile.write_text("".join(f"file '{p}'\n" for p in segments_mp4s))
+
+    # Pass 1: stream-copy concat (fast).
+    interim = SUB_STAGE / "concat.mp4"
+    sh([FFMPEG, "-y", "-loglevel", "error",
+        "-f", "concat", "-safe", "0", "-i", str(listfile),
+        "-c", "copy", "-movflags", "+faststart",
+        str(interim)])
+
+    # Pass 2: drawtext chain via conda ffmpeg. Stage everything under
+    # /tmp/bb_burn/ so the filter graph contains only ASCII paths.
+    stage_srt = SUB_STAGE / "subs.srt"
+    stage_srt.write_text(srt_path.read_text(encoding="utf-8"), encoding="utf-8")
+    stage_out = SUB_STAGE / "out.mp4"
+
+    entries = _parse_srt(stage_srt)
+    vf = _drawtext_chain(entries)
+
+    sh([FFMPEG_DRAW, "-y", "-loglevel", "error",
+        "-i", "concat.mp4",
+        "-vf", vf,
+        "-c:v", "libopenh264", "-b:v", "4500k",
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-c:a", "copy",
+        "out.mp4"], cwd=str(SUB_STAGE))
+
+    if out_path.exists():
+        out_path.unlink()
+    stage_out.replace(out_path)
+    interim.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------- inventory seed ---
 _INVENTORY_SEED = {
     "scannedAt": 0,
     "total": 67,
@@ -301,224 +546,6 @@ _INVENTORY_SEED = {
 }
 
 
-def seed_state(page, view):
-    """Set up the app to land on exactly the right stage for a recording.
-
-    Pre-build stages drive through the React `__bbDev__` hooks (which only
-    open under `?demo=1`). Build/learn/celebrate seed localStorage so the
-    BuildContext rehydrates with a selected model on first paint.
-    """
-    if view == "keep_state":
-        return
-    state = VIEW_STATE.get(view)
-    if state is None:
-        raise RuntimeError(f"unknown view: {view!r}")
-
-    # Always clear and reload so we never inherit the previous segment's state.
-    # This also forces the React tree to re-mount (replays entrance animations).
-    page.evaluate("() => localStorage.clear()")
-    page.goto(PROTO_URL, wait_until="domcontentloaded")
-    # Wait for the demo hook to install — it's gated on a useEffect so first
-    # paint may not have it yet.
-    page.wait_for_function(
-        "() => !!window.__bbDev__",
-        timeout=5000,
-    )
-
-    if state["stage"] == "splash":
-        return  # already on splash after fresh load
-
-    if state["stage"] == "discover":
-        page.evaluate("() => window.__bbDev__.setStage('discover')")
-        page.wait_for_timeout(900)
-        return
-
-    if state["stage"] == "inventory":
-        # Seed the inventory and jump straight to the screen. The scan
-        # animation plays once on mount, takes ~2.4s, then morphs to results.
-        page.evaluate(
-            "(inv) => { window.__bbDev__.setInventory(inv); window.__bbDev__.setStage('inventory'); }",
-            _INVENTORY_SEED,
-        )
-        if state["wait_for"] == "scan":
-            # Catch the scan mid-flight (~half-way through the 2.4s animation).
-            page.wait_for_timeout(700)
-        else:  # results
-            # Wait for scan to complete + recommendations to slide in.
-            page.wait_for_timeout(4200)
-        return
-
-    if state["model"]:
-        # Build/Learn/Celebrate: seed localStorage so BuildContext rehydrates
-        # with the right model + step, then reload.
-        seed = {
-            "stage":           state["stage"],
-            "selectedModelId": state["model"],
-            "customModel":     None,
-            "currentStep":     state["step"],
-            "steamProgress":   {"science": 0, "technology": 0, "engineering": 0, "art": 0, "math": 0},
-            "buildStartTime":  None,
-            "savedAt":         9999999999999,  # avoid 24h expiry
-        }
-        page.evaluate(
-            "(s) => { localStorage.setItem('brickbuddy_session', JSON.stringify(s)); }", seed,
-        )
-        page.goto(PROTO_URL, wait_until="domcontentloaded")
-        # Different stages mount different hooks:
-        #   build     → __bb__   (voice/tap pipelines)
-        #   learn     → __bbDev__ only (no build-screen-specific hook)
-        #   celebrate → __bbDev__ only
-        # Always wait for __bbDev__ since it's set by BuildContext on every stage.
-        page.wait_for_function("() => !!window.__bbDev__", timeout=8000)
-        if state["stage"] == "build":
-            page.wait_for_function("() => !!window.__bb__", timeout=5000)
-        page.wait_for_timeout(1200)  # R3F first paint + auto-rotate kicks in
-
-
-# -------------------------------------------------- choreography runner ---
-def run_choreo(page, choreo):
-    """Execute a segment's action script. Each step is timed to the narration."""
-    for step in choreo or []:
-        kind = step[0]
-        if kind == "wait":
-            page.wait_for_timeout(int(step[1] * 1000))
-        elif kind == "click":
-            try:
-                page.click(step[1], timeout=3000)
-            except Exception as e:
-                print(f"     [click miss] {step[1]}: {e}")
-        elif kind == "click_text":
-            needle = step[1]
-            try:
-                page.evaluate(
-                    """(txt) => {
-                        const btn = [...document.querySelectorAll('button')].find(
-                          b => b.textContent.trim().includes(txt)
-                        );
-                        if (btn) btn.click();
-                    }""",
-                    needle,
-                )
-            except Exception as e:
-                print(f"     [click_text miss] {needle!r}: {e}")
-        elif kind == "type":
-            selector, value = step[1], step[2]
-            try:
-                # force=True bypasses React's disabled-prop check; visible
-                # inputs get the value even while the app is processing.
-                page.locator(selector).first.fill(value, force=True, timeout=5000)
-            except Exception as e:
-                # Fallback: set the value directly and fire React's synthetic
-                # events so controlled components pick it up.
-                try:
-                    page.evaluate(
-                        """([sel, val]) => {
-                           const el = document.querySelector(sel);
-                           if (!el) return false;
-                           const setter = Object.getOwnPropertyDescriptor(
-                             window.HTMLInputElement.prototype, 'value').set;
-                           setter.call(el, val);
-                           el.dispatchEvent(new Event('input', { bubbles: true }));
-                           el.dispatchEvent(new Event('change', { bubbles: true }));
-                           el.focus();
-                           return true;
-                        }""",
-                        [selector, value],
-                    )
-                except Exception as e2:
-                    print(f"     [type miss] {selector}: {e} / {e2}")
-        elif kind == "press":
-            page.keyboard.press(step[1])
-        elif kind == "eval":
-            try:
-                page.evaluate(step[1])
-            except Exception as e:
-                print(f"     [eval miss]: {e}")
-        elif kind == "caption":
-            set_caption(page, step[1])
-        else:
-            print(f"     [unknown choreo step] {step!r}")
-
-
-# ------------------------------------------------------- per-segment job ---
-def record_slide(seg, browser, narration_s):
-    """Navigate to slides.html?slide=N and record for the narration's length."""
-    ctx = browser.new_context(
-        viewport={"width": VIEWPORT[0], "height": VIEWPORT[1]},
-        device_scale_factor=1,
-        record_video_dir=str(TMP_DIR),
-        record_video_size={"width": VIEWPORT[0], "height": VIEWPORT[1]},
-    )
-    page = ctx.new_page()
-    slide_url = f"http://127.0.0.1:{PORT_SLIDES}/slides.html?slide={seg['slide']}"
-    page.goto(slide_url, wait_until="domcontentloaded")
-    page.wait_for_timeout(int(PAD_SLIDE * 1000))
-    page.wait_for_timeout(int((narration_s + TAIL_HOLD) * 1000))
-    vid = page.video
-    ctx.close()
-    raw_path = pathlib.Path(vid.path())
-    return raw_path, PAD_SLIDE
-
-
-def record_proto(seg, browser, narration_s):
-    """Drive the live BrickBuddy app through the segment's choreography."""
-    ctx = browser.new_context(
-        viewport={"width": VIEWPORT[0], "height": VIEWPORT[1]},
-        device_scale_factor=1,
-        record_video_dir=str(TMP_DIR),
-        record_video_size={"width": VIEWPORT[0], "height": VIEWPORT[1]},
-        permissions=["microphone", "camera"],
-    )
-    page = ctx.new_page()
-    # First load to get access to localStorage, then seed + reload.
-    page.goto(PROTO_URL, wait_until="domcontentloaded")
-    seed_state(page, seg["view"])
-    if seg.get("caption"):
-        set_caption(page, seg["caption"])
-    page.wait_for_timeout(int(PAD_PROTO * 1000))
-    # Run choreo concurrently with narration. The script inside `choreo`
-    # already has `wait` steps timed against the narration's pace.
-    start = time.time()
-    run_choreo(page, seg.get("choreo"))
-    elapsed = time.time() - start
-    remaining = narration_s + TAIL_HOLD - elapsed
-    if remaining > 0:
-        page.wait_for_timeout(int(remaining * 1000))
-    vid = page.video
-    ctx.close()
-    raw_path = pathlib.Path(vid.path())
-    return raw_path, PAD_PROTO
-
-
-# ----------------------------------------------------- mux per-segment ---
-def mux(raw_video, wav, pad_s, narration_s, out_path):
-    """Trim the pre-load padding and mux audio over video."""
-    total = narration_s + HEAD_HOLD + TAIL_HOLD
-    cmd = [
-        FFMPEG, "-y", "-loglevel", "error",
-        "-ss", f"{pad_s:.3f}", "-i", str(raw_video),
-        "-i", str(wav),
-        "-t", f"{total:.3f}",
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-        "-c:a", "aac", "-b:a", "192k",
-        "-r", str(FPS), "-vsync", "cfr",
-        str(out_path),
-    ]
-    sh(cmd)
-
-
-# ------------------------------------------------------------ concat all ---
-def concat(segments_mp4s, out_path):
-    listfile = TMP_DIR / "concat.txt"
-    listfile.write_text("".join(f"file '{p}'\n" for p in segments_mp4s))
-    sh(["ffmpeg", "-y", "-loglevel", "error",
-        "-f", "concat", "-safe", "0", "-i", str(listfile),
-        "-c", "copy", "-movflags", "+faststart",
-        str(out_path)])
-
-
 # ============================================================== main ====
 def main():
     print("▸ BrickBuddy investor demo — building")
@@ -532,31 +559,22 @@ def main():
     print(f"  slides: http://127.0.0.1:{PORT_SLIDES}/slides.html")
     print(f"  proto : {PROTO_URL}  (serving ../../dist)")
 
-    # Step 1 — TTS for every segment (so we know the exact timing budget)
+    # ── TTS ──
     print("▸ TTS")
-    durations = {}
+    audio_durations = {}
     for seg in SEGMENTS:
         wav = AUDIO_DIR / f"{seg['id']}.wav"
+        text = segment_text(seg)
         if not wav.exists():
-            print(f"   · {seg['id']}  ({len(seg['text'].split())} words)")
-            say_to_wav(seg["text"], wav)
-        durations[seg["id"]] = probe_duration(wav) - HEAD_HOLD  # narration only
+            wc = len(text.split())
+            print(f"   · {seg['id']}  ({wc} words)", flush=True)
+            say_to_wav(text, wav)
+        audio_durations[seg["id"]] = probe_duration(wav) - HEAD_HOLD
 
-    # Step 2 — record each segment
+    # ── Record ──
     print("▸ record")
-    # Resolve `keep_state` views → the previous concrete view, so each
-    # recorded context starts on the correct stage even though we spin up a
-    # fresh browser per segment.
-    resolved = []
-    last_view = "splash"
-    for seg in SEGMENTS:
-        s = dict(seg)
-        if s.get("view") == "keep_state":
-            s["view"] = last_view
-        elif s.get("view"):
-            last_view = s["view"]
-        resolved.append(s)
-
+    seg_offsets = []  # (id, base_offset_in_final, audio_dur)
+    cursor = 0.0
     segments_mp4 = []
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -569,33 +587,49 @@ def main():
             ],
         )
         try:
-            for seg in resolved:
+            for seg in SEGMENTS:
                 out = VIDEO_DIR / f"seg_{seg['id']}.mp4"
-                narration_s = durations[seg["id"]]
-                # Cache: skip segments whose final mp4 already exists. To
-                # force a re-render, just delete the file (or the whole
-                # video/ dir). TTS audio is cached the same way.
+                narr_s = audio_durations[seg["id"]]
+                if seg["kind"] == "autopilot":
+                    visual_dur = max(seg.get("duration_s") or 0, narr_s + TAIL_HOLD)
+                else:
+                    visual_dur = narr_s + TAIL_HOLD
+                seg_dur = visual_dur + HEAD_HOLD  # full clip duration
+
+                # Cache: skip segments whose final mp4 already exists.
                 if out.exists():
-                    print(f"   · {seg['id']}  cached")
+                    print(f"   · {seg['id']}  cached ({seg_dur:.1f}s)")
+                    seg_offsets.append((seg["id"], cursor, narr_s))
+                    cursor += seg_dur
                     segments_mp4.append(out)
                     continue
-                print(f"   · {seg['id']}  {seg['kind']:5s}  {narration_s:.1f}s"
-                      f"  view={seg.get('view', '-')}", flush=True)
+
+                print(f"   · {seg['id']}  {seg['kind']:9s}  audio={narr_s:.1f}s  "
+                      f"visual={visual_dur:.1f}s", flush=True)
                 if seg["kind"] == "slide":
-                    raw, pad = record_slide(seg, browser, narration_s)
-                elif seg["kind"] == "proto":
-                    raw, pad = record_proto(seg, browser, narration_s)
+                    raw, pad = record_slide(seg, browser, narr_s)
+                    mux(raw, AUDIO_DIR / f"{seg['id']}.wav", pad, narr_s, out)
+                elif seg["kind"] == "autopilot":
+                    raw, pad = record_autopilot(seg, browser, narr_s)
+                    mux(raw, AUDIO_DIR / f"{seg['id']}.wav", pad, narr_s, out,
+                        hold_s=visual_dur)
                 else:
                     raise RuntimeError(f"unknown kind: {seg['kind']}")
-                mux(raw, AUDIO_DIR / f"{seg['id']}.wav", pad, narration_s, out)
+                seg_offsets.append((seg["id"], cursor, narr_s))
+                cursor += seg_dur
                 segments_mp4.append(out)
                 raw.unlink(missing_ok=True)
         finally:
             browser.close()
 
-    # Step 3 — concatenate
-    print("▸ concat")
-    concat(segments_mp4, FINAL)
+    # ── SRT ──
+    print("▸ subtitles")
+    write_srt(seg_offsets, SEGMENTS, SRT_PATH)
+    print(f"   · {SRT_PATH.name}")
+
+    # ── Concat + burn subs ──
+    print("▸ concat + burn subs")
+    concat_and_burn(segments_mp4, SRT_PATH, FINAL)
     dur = probe_duration(FINAL)
     mb = FINAL.stat().st_size / 1024 / 1024
     print(f"✓ {FINAL.name}  {dur:.1f}s  {mb:.1f} MB")
