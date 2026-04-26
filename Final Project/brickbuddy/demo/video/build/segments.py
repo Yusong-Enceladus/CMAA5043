@@ -348,8 +348,8 @@ SEGMENTS = [
     {
         "id": "S21", "kind": "slide", "slide": 6,
         "text": (
-            "The prototype is live on Cloudflare Pages. "
-            "Scan the code, try it in your browser, "
+            "The prototype is live on Cloudflare's edge. "
+            "Scan the code, try it in any browser, "
             "and come find us at the CMA exhibition. "
             "Thanks for watching."
         ),
