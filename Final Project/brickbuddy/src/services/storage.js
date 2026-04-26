@@ -19,7 +19,6 @@ export function saveSession(state) {
       selectedModelId: state.selectedModel?.id || null,
       customModel: isCustom ? state.selectedModel : null,
       currentStep: state.currentStep,
-      chatHistory: state.chatHistory,
       steamProgress: state.steamProgress,
       buildStartTime: state.buildStartTime,
       savedAt: Date.now(),

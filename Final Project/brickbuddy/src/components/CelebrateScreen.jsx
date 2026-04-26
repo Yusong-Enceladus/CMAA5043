@@ -63,7 +63,7 @@ function Confetti() {
 export default function CelebrateScreen() {
   const {
     selectedModel, steamProgress, achievements, buildDuration,
-    chatHistory, resetSession, setStage, soundEnabled,
+    modificationLog, resetSession, setStage, soundEnabled,
   } = useBuild();
   const [saved, setSaved] = useState(false);
 
@@ -76,7 +76,7 @@ export default function CelebrateScreen() {
   const minutes = buildDuration > 0 ? formatDuration(buildDuration) : '—';
   const totalSteam = Object.values(steamProgress).reduce((a, b) => a + b, 0);
   const topicsExplored = Object.values(steamProgress).filter(v => v > 0).length;
-  const questionsAsked = chatHistory.filter(m => m.role === 'child').length;
+  const customizations = modificationLog?.length || 0;
 
   const handleDownloadCertificate = () => {
     const canvas = document.createElement('canvas');
@@ -198,7 +198,7 @@ export default function CelebrateScreen() {
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">&#x2605; {totalSteam} STEAM</Chip>
-                <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">&#x2605; {questionsAsked} questions</Chip>
+                <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">&#x2605; {customizations} customizations</Chip>
                 <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">&#x2605; {topicsExplored} topics</Chip>
               </div>
             </Card>

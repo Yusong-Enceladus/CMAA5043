@@ -8,16 +8,17 @@
 import { BuildProvider, useBuild } from './context/BuildContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import SplashScreen from './components/SplashScreen';
-import ImagineScreen from './components/ImagineScreen';
+import DiscoverScreen from './components/DiscoverScreen';
+import InventoryScreen from './components/InventoryScreen';
 import BuildScreen from './components/BuildScreen';
 import LearnScreen from './components/LearnScreen';
 import CelebrateScreen from './components/CelebrateScreen';
 import './App.css';
 
-export const STAGES = ['splash', 'imagine', 'build', 'learn', 'celebrate'];
+export const STAGES = ['splash', 'discover', 'inventory', 'build', 'learn', 'celebrate'];
 
 export function ProgressDots() {
-  const { stage, setStage, selectedModel } = useBuild();
+  const { stage, setStage, selectedModel, inventory } = useBuild();
   if (stage === 'splash') return null;
   const idx = STAGES.indexOf(stage);
   return (
@@ -28,11 +29,14 @@ export function ProgressDots() {
     }}>
       {STAGES.map((s, i) => {
         // Allow nav back to any stage the user has reached so far.
-        // Forward nav only to stages that legitimately unlock: splash→imagine
-        // anytime, imagine→build needs a model, later stages need prior ones.
+        // Forward nav only to stages that legitimately unlock: splash→discover
+        // anytime, discover→inventory needs nothing, inventory→build needs a
+        // model, later stages need prior ones.
         const unlocked = i <= idx
           || (i === 1 && idx === 0)
-          || (i === 2 && selectedModel && idx >= 1);
+          || (i === 2 && idx >= 1)
+          || (i === 3 && selectedModel && idx >= 2)
+          || (i === 4 && selectedModel && idx >= 3 && inventory);
         return (
           <button
             key={s}
@@ -61,7 +65,8 @@ function AppRouter() {
   let screen;
   switch (stage) {
     case 'splash':    screen = <SplashScreen />;    break;
-    case 'imagine':   screen = <ImagineScreen />;   break;
+    case 'discover':  screen = <DiscoverScreen />;  break;
+    case 'inventory': screen = <InventoryScreen />; break;
     case 'build':     screen = <BuildScreen />;     break;
     case 'learn':     screen = <LearnScreen />;     break;
     case 'celebrate': screen = <CelebrateScreen />; break;

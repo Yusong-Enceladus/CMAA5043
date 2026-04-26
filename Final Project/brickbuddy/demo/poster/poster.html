@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>BrickBuddy · A4 poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --ink:#1A1410; --ink-2:#3A2C21; --ink-3:#6A5445; --ink-4:#A18E7E;
+    --paper:#FFF6EC; --paper-2:#FDEAD5; --paper-3:#FFE0CC;
+    --card:#FFFFFF; --rule:rgba(26,20,16,0.10); --rule-2:rgba(26,20,16,0.18);
+    --brick-red:#E14F3B; --brick-red-d:#B2392A;
+    --brick-orange:#F59E0B; --brick-yellow:#FBBF24;
+    --brick-green:#10B981; --brick-blue:#3B82F6;
+    --brick-navy:#1F2937;  --brick-gray:#6B7280;
+    --live:#2F6FEB; --ok:#0F9968; --violet:#8357E6;
+    --sans:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;
+    --serif:"Fraunces",ui-serif,Georgia,serif;
+    --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  /* A4 portrait @ 96dpi = 794 × 1123.  Render at 2× via Playwright for
+     print-quality PNG, or use the browser's Print-to-PDF to produce a true
+     A4 with vectors. */
+  @page { size: A4 portrait; margin: 0; }
+  html, body {
+    width: 210mm; height: 297mm;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--sans);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .poster {
+    width: 210mm; height: 297mm;
+    position: relative;
+    padding: 12mm 12mm 10mm;
+    display: grid;
+    grid-template-rows: auto auto auto auto auto 1fr auto;
+    gap: 5mm;
+    overflow: hidden;
+  }
+
+  /* ── Decorative floating bricks (hello from the slide deck) ── */
+  .bg-brick {
+    position: absolute; border-radius: 2mm; opacity: 0.65;
+    box-shadow: 0 1mm 0 rgba(0,0,0,0.15), 0 4mm 8mm rgba(0,0,0,0.05);
+    pointer-events: none;
+  }
+  .bg-brick::before, .bg-brick::after {
+    content:""; position:absolute; top:-1.5mm; width:2.5mm; height:2.5mm;
+    border-radius:50%; background:inherit;
+    box-shadow: 0 -0.2mm 0 rgba(0,0,0,0.2);
+  }
+  .bg-brick::before { left: 22%; }
+  .bg-brick::after  { right: 22%; }
+
+  .b1 { top:  8mm; left: -6mm; width: 18mm; height: 12mm; background: var(--brick-red);    transform: rotate(-12deg); }
+  .b2 { top: 58mm; right: -4mm; width: 14mm; height:  9mm; background: var(--brick-orange); transform: rotate(10deg); }
+  .b3 { top:180mm; left: -5mm; width: 16mm; height: 11mm; background: var(--brick-blue);   transform: rotate(18deg); }
+  .b4 { top:230mm; right: 0mm; width: 11mm; height:  8mm; background: var(--brick-yellow); transform: rotate(-8deg); }
+  .b5 { top:110mm; right: -2mm; width:  9mm; height:  6mm; background: var(--brick-green);  transform: rotate(-14deg); }
+
+  /* ── Top bar ── */
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    font: 700 8pt/1 var(--mono); letter-spacing: 0.22em; color: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .logo-dot {
+    width: 3mm; height: 3mm; border-radius: 1mm;
+    background: var(--brick-red); display: inline-block; margin-right: 2mm;
+    vertical-align: -0.2mm; box-shadow: 0 0.5mm 0 var(--brick-red-d);
+  }
+
+  /* ── Hero ── */
+  .hero {
+    display: grid; grid-template-columns: 38mm 1fr; gap: 6mm; align-items: center;
+  }
+  .mascot {
+    width: 38mm; height: 38mm; border-radius: 8mm; background: var(--brick-orange);
+    position: relative;
+    box-shadow: 0 2.5mm 0 #C78108, 0 5mm 14mm rgba(245,158,11,0.35);
+  }
+  .mascot::before, .mascot::after {
+    content: ""; position: absolute; top: 11mm; width: 6mm; height: 6mm;
+    border-radius: 50%; background: var(--ink);
+  }
+  .mascot::before { left: 10mm; }
+  .mascot::after  { right: 10mm; }
+  .mascot .mouth {
+    position: absolute; bottom: 10mm; left: 50%; transform: translateX(-50%);
+    width: 15mm; height: 6mm; border-radius: 0 0 7mm 7mm; background: var(--ink);
+  }
+  .mascot .antenna {
+    position: absolute; top: -5mm; left: 50%; transform: translateX(-50%);
+    width: 1.2mm; height: 5mm; background: var(--ink);
+  }
+  .mascot .antenna::after {
+    content: ""; position: absolute; top: -2mm; left: -1.3mm;
+    width: 3.8mm; height: 3.8mm; border-radius: 50%; background: var(--brick-red);
+  }
+  .hero .txt .kicker {
+    font: 700 8pt/1 var(--mono); letter-spacing: 0.28em; color: var(--brick-red);
+    text-transform: uppercase; margin-bottom: 2.5mm;
+  }
+  .hero .txt h1 {
+    font-family: var(--serif); font-weight: 700; font-size: 30pt;
+    line-height: 1.0; letter-spacing: -0.02em; color: var(--ink);
+  }
+  .hero .txt h1 em { font-style: italic; font-weight: 500; color: var(--brick-red); }
+  .hero .txt h1 .o { color: var(--brick-orange); font-style: italic; font-weight: 500; }
+  .hero .txt p.tagline {
+    margin-top: 2.5mm; font-size: 10pt; line-height: 1.4; color: var(--ink-2);
+    font-weight: 500; max-width: 115mm;
+  }
+
+  /* ── Problem / Product two-up ── */
+  .duo {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 6mm; align-items: stretch;
+  }
+  .duo .card {
+    background: var(--card); border: 0.4mm solid var(--rule); border-radius: 4mm;
+    padding: 3.5mm 4mm; box-shadow: 0 1.5mm 4mm rgba(26,20,16,0.05);
+    display: flex; flex-direction: column; gap: 1.5mm;
+  }
+  .duo .card.old { transform: rotate(-0.7deg); }
+  .duo .card.new { transform: rotate(0.7deg); }
+  .duo .card .cap {
+    font: 700 7pt/1 var(--mono); letter-spacing: 0.22em;
+    color: var(--ink-4); text-transform: uppercase;
+  }
+  .duo .card h3 { font-family: var(--serif); font-size: 14pt; line-height: 1.1; }
+  .duo .card ul { list-style: none; display: grid; gap: 1.3mm; font-size: 9pt; color: var(--ink-2); }
+  .duo .card li { display: flex; gap: 1.8mm; align-items: baseline; line-height: 1.3; }
+  .duo .card.old li::before { content: "✕"; color: var(--brick-red); font-weight: 700; }
+  .duo .card.new li::before { content: "✓"; color: var(--ok);        font-weight: 700; }
+  .duo .arrow {
+    width: 10mm; height: 10mm; border-radius: 50%; margin: auto 0;
+    background: var(--ink); color: var(--paper);
+    display: grid; place-items: center; font-size: 11pt;
+    box-shadow: 0 1mm 0 var(--ink-2);
+  }
+
+  /* ── Four-stage flow ── */
+  .flow-title {
+    font: 700 8pt/1 var(--mono); letter-spacing: 0.28em; color: var(--brick-red);
+    text-transform: uppercase;
+  }
+  .flow {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 2.5mm;
+  }
+  .stage {
+    border-radius: 4mm; padding: 3mm 3.5mm 3mm;
+    box-shadow: 0 1.5mm 4mm rgba(26,20,16,0.05);
+    display: flex; flex-direction: column; gap: 0.8mm;
+    position: relative;
+  }
+  .stage .ic { font-size: 13pt; }
+  .stage .num {
+    font: 700 6.5pt/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
+    opacity: 0.6;
+  }
+  .stage h4 { font-family: var(--serif); font-size: 13pt; line-height: 1.05; }
+  .stage p { font-size: 7.8pt; line-height: 1.35; color: var(--ink-3); }
+  .stage .chip {
+    margin-top: 2mm; font: 700 6pt/1 var(--mono); letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .s1 { background: #FFE0CC; }   /* discover */
+  .s2 { background: #FEE9CA; }   /* inventory */
+  .s3 { background: #FCE7F3; }   /* build (showpiece — pink) */
+  .s4 { background: #E6F4F1; }   /* learn */
+  .s5 { background: #F0E6FA; }   /* celebrate */
+  .s1 .chip { color: var(--brick-red); }
+  .s2 .chip { color: var(--brick-orange); }
+  .s3 .chip { color: #9D174D; }
+  .s4 .chip { color: var(--ok); }
+  .s5 .chip { color: var(--violet); }
+
+  /* ── Why it ships (3-col) ── */
+  .why-title {
+    font: 700 8pt/1 var(--mono); letter-spacing: 0.28em; color: var(--brick-red);
+    text-transform: uppercase;
+  }
+  .why {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm;
+    flex: 1;
+  }
+  .why .wcard p { font-size: 8pt; line-height: 1.4; color: var(--ink-2); }
+  .why .wcard {
+    background: var(--card); border: 0.4mm solid var(--rule); border-radius: 3mm;
+    padding: 3mm 3.5mm; display: grid; gap: 0.7mm;
+  }
+  .why .wcard .ic { font-size: 13pt; }
+  .why .wcard h5 {
+    font-family: var(--serif); font-size: 10.5pt; line-height: 1.1; letter-spacing: -0.01em;
+  }
+  .why .wcard p { font-size: 7.4pt; line-height: 1.35; color: var(--ink-3); }
+
+  /* ── Footer: team + URLs ── */
+  .footer {
+    display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 6mm;
+    align-items: center; border-top: 0.4mm solid var(--rule); padding-top: 4mm;
+  }
+  .team { display: grid; gap: 2mm; }
+  .member { display: flex; gap: 2.5mm; align-items: center; font-size: 8pt; line-height: 1.3; color: var(--ink-2); }
+  .member .avatar {
+    flex-shrink: 0; width: 8mm; height: 8mm; border-radius: 2mm;
+    color: #FFF; display: grid; place-items: center;
+    font-family: var(--serif); font-weight: 700; font-size: 10pt;
+    box-shadow: 0 0.6mm 0 rgba(0,0,0,0.15);
+  }
+  .m1 .avatar { background: var(--brick-red); box-shadow: 0 0.6mm 0 var(--brick-red-d); }
+  .m2 .avatar { background: var(--brick-blue); box-shadow: 0 0.6mm 0 #1E4FC4; }
+  .member .nm { font-weight: 800; color: var(--ink); }
+  .member .rl { color: var(--ink-3); font-family: var(--mono); font-size: 6.5pt; letter-spacing: 0.16em; text-transform: uppercase; }
+
+  .links { display: grid; gap: 1.3mm; font-size: 7.6pt; line-height: 1.2; font-family: var(--mono); color: var(--ink-2); }
+  .links .lbl { font: 700 6.3pt/1 var(--mono); letter-spacing: 0.22em; color: var(--ink-4); text-transform: uppercase; margin-right: 1.4mm; }
+
+  .qr {
+    width: 28mm; height: 28mm; border-radius: 3mm; background: var(--card);
+    border: 0.6mm solid var(--ink); padding: 2mm;
+    display: grid; place-items: center; font-family: var(--mono); font-size: 6pt; color: var(--ink-3);
+    position: relative;
+  }
+  .qr .url {
+    position: absolute; bottom: -4.5mm; left: 0; right: 0; text-align: center;
+    font: 700 6pt/1 var(--mono); letter-spacing: 0.18em; color: var(--ink-2); text-transform: uppercase;
+  }
+  .qr img { width: 100%; height: 100%; image-rendering: pixelated; }
+
+  .footer .tiny {
+    position: absolute; bottom: 3mm; left: 12mm; right: 12mm;
+    display: flex; justify-content: space-between;
+    font: 500 5.5pt/1 var(--mono); letter-spacing: 0.2em; color: var(--ink-4);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="poster">
+
+  <span class="bg-brick b1"></span>
+  <span class="bg-brick b2"></span>
+  <span class="bg-brick b3"></span>
+  <span class="bg-brick b4"></span>
+  <span class="bg-brick b5"></span>
+
+  <!-- ── Top bar ── -->
+  <div class="top">
+    <div><span class="logo-dot"></span>BrickBuddy</div>
+    <div>CMAA5043 · Final Project · Spring 2026</div>
+  </div>
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="mascot">
+      <span class="antenna"></span>
+      <span class="mouth"></span>
+    </div>
+    <div class="txt">
+      <div class="kicker">Meet BrickBuddy</div>
+      <h1>Show the pile.<br/><em>Pick a build.</em> <span class="o">Change anything.</span></h1>
+      <p class="tagline">
+        An AI building companion for children aged 6–8. Scan your bricks, pick a robot,
+        then change it by voice or tap — and watch the instruction manual rewrite itself
+        in real time.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Problem / Promise ── -->
+  <div class="duo">
+    <div class="card old">
+      <div class="cap">The booklet</div>
+      <h3>One-way paper.</h3>
+      <ul>
+        <li>Can't see what bricks the kid actually has</li>
+        <li>Can't answer "why?" or adapt mid-build</li>
+        <li>Can't recolor when they want something different</li>
+        <li>Only shows one "correct" model</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="card new">
+      <div class="cap">BrickBuddy</div>
+      <h3>A living manual.</h3>
+      <ul>
+        <li>Scans the pile, recommends a build</li>
+        <li>"Make it blue" — 3D and manual rewrite themselves</li>
+        <li>Tap a brick to recolor only that one</li>
+        <li>Teaches STEAM through every step</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── Five-stage arc ── -->
+  <div>
+    <div class="flow-title">Every session follows one arc · five screens, zero menus</div>
+  </div>
+  <div class="flow">
+    <div class="stage s1">
+      <div class="ic">📷</div>
+      <div class="num">Stage 1</div>
+      <h4>Discover</h4>
+      <p>Camera-first. Scan the pile, tell Buddy out loud, or just browse. One primary action, no text fields.</p>
+      <div class="chip">Camera · Voice</div>
+    </div>
+    <div class="stage s2">
+      <div class="ic">🧮</div>
+      <div class="num">Stage 2</div>
+      <h4>Inventory</h4>
+      <p>An animated scan reveals every brick by color and count, then ranks three matched builds on what the kid actually owns.</p>
+      <div class="chip">Scan · Recommend</div>
+    </div>
+    <div class="stage s3">
+      <div class="ic">🔨</div>
+      <div class="num">Stage 3</div>
+      <h4>Build <span style="color:var(--brick-red); font-style: italic;">★</span></h4>
+      <p>3D viewer + paper manual. Say <em>"make it blue"</em> or tap a brick — both 3D and manual rewrite themselves in real time.</p>
+      <div class="chip">3D · Voice · Tap</div>
+    </div>
+    <div class="stage s4">
+      <div class="ic">🔬</div>
+      <div class="num">Stage 4</div>
+      <h4>Learn</h4>
+      <p>Five STEAM tabs grounded in what was just built. A two-question quiz lights up achievements, not grades.</p>
+      <div class="chip">Sci · Tech · Eng · Art · Math</div>
+    </div>
+    <div class="stage s5">
+      <div class="ic">🏆</div>
+      <div class="num">Stage 5</div>
+      <h4>Celebrate</h4>
+      <p>Confetti, a rotating 3D trophy, a build report, and a printable certificate with the child's name on it.</p>
+      <div class="chip">Report · Certificate</div>
+    </div>
+  </div>
+
+  <!-- ── Why it ships — three pillars instead of six cards ── -->
+  <div>
+    <div class="why-title">What makes it work · three honest claims</div>
+  </div>
+  <div class="why">
+    <div class="wcard">
+      <div class="ic">📖</div>
+      <h5>Model and manual share one source</h5>
+      <p>Voice, tap, and structural edits flow through a single mutation engine. The 3D view, the printed manual, and the change log all read from the same data — never out of sync.</p>
+    </div>
+    <div class="wcard">
+      <div class="ic">🧩</div>
+      <h5>Every brick is data</h5>
+      <p>Models are stored as structured brick data. Inventory counts, manual steps, and 3D rendering all read from the same source — adding a model is one JSON file, not rewriting screens.</p>
+    </div>
+    <div class="wcard">
+      <div class="ic">🪶</div>
+      <h5>Runs from a URL</h5>
+      <p>Single-page web app on Cloudflare's edge. No app store, no install, no parent setup. Open the link, point a webcam, build something. Works on a Chromebook in a school.</p>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <div class="team">
+      <div class="member m1">
+        <div class="avatar">Y</div>
+        <div>
+          <div class="nm">Yusong Huang</div>
+          <div class="rl">Full implementation · Materials</div>
+          <div style="font-size:6.8pt;color:var(--ink-3);margin-top:0.6mm">Engineered every screen — React, 3D viewer, AI pipeline, Cloudflare deployment — and produced this demo + poster + report.</div>
+        </div>
+      </div>
+      <div class="member m2">
+        <div class="avatar">J</div>
+        <div>
+          <div class="nm">Jiayi Huang</div>
+          <div class="rl">Ideation · Materials</div>
+          <div style="font-size:6.8pt;color:var(--ink-3);margin-top:0.6mm">Brought the original BrickBuddy concept, user research with children 6–8, and co-produced the demo materials.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="links">
+      <div><span class="lbl">Live</span>brickbuddy.pages.dev</div>
+      <div><span class="lbl">Repo</span>github.com/Yusong-Enceladus/CMAA5043</div>
+      <div><span class="lbl">Demo video</span>demo/video/BrickBuddy_investor_demo.mp4</div>
+      <div><span class="lbl">Built with</span>React 19 · R3F · Three.js · Cloudflare Pages</div>
+    </div>
+
+    <div class="qr">
+      <img src="qr.png" alt="QR: live BrickBuddy prototype" />
+      <div class="url">Scan → try it</div>
+    </div>
+  </div>
+
+  <div class="tiny">
+    <div>BRICKBUDDY · AI BUILDING COMPANION · AGES 6–8</div>
+    <div>Yusong Huang · Jiayi Huang</div>
+  </div>
+</div>
+</body>
+</html>

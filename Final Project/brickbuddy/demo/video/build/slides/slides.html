@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1600,initial-scale=1" />
+<title>BrickBuddy · Investor deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,800;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --ink:        #1A1410;
+    --ink-2:      #3A2C21;
+    --ink-3:      #6A5445;
+    --ink-4:      #A18E7E;
+    --paper:      #FFF6EC;
+    --paper-2:    #FDEAD5;
+    --paper-3:    #FFE0CC;
+    --card:       #FFFFFF;
+    --rule:       rgba(26, 20, 16, 0.08);
+    --rule-2:     rgba(26, 20, 16, 0.16);
+    --brick-red:    #E14F3B;
+    --brick-red-d:  #B2392A;
+    --brick-orange: #F59E0B;
+    --brick-yellow: #FBBF24;
+    --brick-green:  #10B981;
+    --brick-blue:   #3B82F6;
+    --brick-navy:   #1F2937;
+    --brick-gray:   #6B7280;
+    --live:       #2F6FEB;
+    --live-soft:  #DCE7FB;
+    --ok:         #0F9968;
+    --warn:       #E0701B;
+    --violet:     #8357E6;
+    --sans:  "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Fraunces", ui-serif, Georgia, serif;
+    --mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1600px; height: 900px;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--sans);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .deck { position: relative; width: 1600px; height: 900px; }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    overflow: hidden;
+  }
+  .slide.active { display: block; }
+  .slide.active .anim { animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .slide.active .anim-1 { animation-delay: 0.08s; }
+  .slide.active .anim-2 { animation-delay: 0.22s; }
+  .slide.active .anim-3 { animation-delay: 0.36s; }
+  .slide.active .anim-4 { animation-delay: 0.50s; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(22px); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+  }
+
+  /* ── Shared frame: top bar + footer brand strip on every slide ── */
+  .frame {
+    position: absolute; inset: 0;
+    padding: 58px 92px 70px;
+    display: flex; flex-direction: column;
+  }
+  /* Tighter mono labels — previous deck had 0.28em+ tracking which read
+     thin and stretched on screen. 0.16em + weight 700 keeps them legible
+     after video compression. */
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    font: 700 13px/1 var(--mono); letter-spacing: 0.16em;
+    color: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .logo-dot {
+    width: 14px; height: 14px; border-radius: 4px; background: var(--brick-red);
+    display: inline-block; margin-right: 10px; vertical-align: -2px;
+    box-shadow: 0 2px 0 var(--brick-red-d);
+  }
+  .foot {
+    position: absolute; bottom: 32px; left: 92px; right: 92px;
+    display: flex; align-items: center; justify-content: space-between;
+    font: 700 12px/1 var(--mono); letter-spacing: 0.18em;
+    color: var(--ink-3); text-transform: uppercase;
+    opacity: 0.78;
+  }
+  .pageno { font-variant-numeric: tabular-nums; }
+
+  /* Inline italic accent: previous deck let "moat is" collide visually.
+     0.06em margin keeps an italic word from kissing the next roman one. */
+  .accent {
+    color: var(--brick-red);
+    font-style: italic;
+    font-weight: 500;
+    margin: 0 0.06em;
+  }
+
+  /* ── Floating bricks (decorative — fewer than the previous draft so the
+        opener isn't competing with itself) ── */
+  .brick { position: absolute; border-radius: 7px; opacity: 0.78;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.10), 0 16px 32px rgba(0,0,0,0.05);
+    pointer-events: none;
+  }
+  .brick::before, .brick::after {
+    content: ""; position: absolute; top: -6px; width: 10px; height: 10px;
+    border-radius: 999px; background: inherit;
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.16);
+  }
+  .brick::before { left: 22%; }
+  .brick::after  { right: 22%; }
+
+  /* ──────────────────────────────── SLIDE 1 — HOOK ──────────────────── */
+  .s1 .frame { justify-content: center; }
+  .s1 .hero {
+    max-width: 1280px; margin: 0 auto; text-align: center;
+    display: flex; flex-direction: column; gap: 32px; align-items: center;
+  }
+  .s1 .kicker {
+    font: 700 13px/1 var(--mono); letter-spacing: 0.22em;
+    color: var(--brick-red); text-transform: uppercase;
+  }
+  .s1 h1 {
+    font-family: var(--serif); font-weight: 800; font-size: 104px; line-height: 1.0;
+    letter-spacing: -0.04em; color: var(--ink);
+  }
+  .s1 .sub {
+    font-size: 26px; line-height: 1.42; max-width: 940px; color: var(--ink-2);
+    font-weight: 500;
+  }
+  /* Decorative bricks — kept three of the original six so the slide has
+     air, and lowered opacity so they don't compete with the headline. */
+  .s1 .br-red    { top: 12%; left: 6%;  width: 86px; height: 60px; background: var(--brick-red);    transform: rotate(-9deg); }
+  .s1 .br-blue   { bottom: 16%; left: 7%; width: 76px; height: 54px; background: var(--brick-blue);   transform: rotate(13deg); }
+  .s1 .br-yellow { bottom: 22%; right: 8%; width: 64px; height: 44px; background: var(--brick-yellow); transform: rotate(-6deg); }
+
+  /* ──────────────────────────────── SLIDE 2 — THE GAP ───────────────── */
+  .s2 .frame { justify-content: center; gap: 28px; }
+  .s2 .grid {
+    /* Asymmetric: right column is ~10% wider so the "what BrickBuddy adds"
+       card reads as the destination, not just a comparison column. */
+    display: grid; grid-template-columns: 0.95fr auto 1.10fr; gap: 56px; align-items: center;
+    max-width: 1380px; margin: 0 auto; margin-top: 18px;
+  }
+  .s2 h1 {
+    font-family: var(--serif); font-weight: 800; font-size: 76px; line-height: 1.04;
+    letter-spacing: -0.03em; color: var(--ink); text-align: center; max-width: 1200px; margin: 0 auto;
+  }
+  .s2 h1 .red { color: var(--brick-red); }
+  .s2 .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 24px;
+    padding: 32px 32px 28px; box-shadow: 0 12px 40px rgba(26,20,16,0.06);
+  }
+  .s2 .card.old { transform: rotate(-1.0deg); }
+  .s2 .card.new {
+    transform: rotate(1.0deg);
+    /* Warm tint on the destination card */
+    background: linear-gradient(165deg, #FFF8F0 0%, #FFEFD8 100%);
+    border-color: rgba(225,79,59,0.18);
+  }
+  .s2 .cap {
+    font: 700 11px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 14px;
+  }
+  .s2 .card h3 { font-family: var(--serif); font-size: 36px; line-height: 1.08; margin-bottom: 16px; font-weight: 800; letter-spacing: -0.02em; }
+  .s2 .card ul { list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 18px; color: var(--ink-2); }
+  .s2 .card li { display: flex; gap: 12px; align-items: flex-start; line-height: 1.45; }
+  .s2 .card.old li::before { content: "✕"; color: var(--warn); font-weight: 700; font-size: 18px; flex-shrink: 0; line-height: 1.45; }
+  .s2 .card.new li::before { content: "✓"; color: var(--ok);   font-weight: 700; font-size: 18px; flex-shrink: 0; line-height: 1.45; }
+  /* Slim red arrow instead of the heavy black circle from the prior draft */
+  .s2 .arrow {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(225,79,59,0.08); color: var(--brick-red);
+    display: grid; place-items: center;
+    font: 800 26px/1 var(--sans);
+    border: 2px solid rgba(225,79,59,0.32);
+  }
+
+  /* ──────────────────────────────── SLIDE 3 — THE PRODUCT ───────────── */
+  /* Slide 3 vertically centers the hero — but if we set justify-content
+     center on the frame, the top bar collapses into the hero (the .top
+     row participates in the flex layout). Instead we float .top to the
+     top with absolute positioning, then center the hero in the remaining
+     space. */
+  .s3 .frame {
+    justify-content: center; align-items: center;
+    padding-top: 0;
+  }
+  .s3 .top {
+    position: absolute; top: 58px; left: 92px; right: 92px;
+  }
+  .s3 .hero { display: grid; grid-template-columns: auto 1fr; gap: 70px; align-items: center; max-width: 1380px; }
+  .s3 .mascot {
+    width: 260px; height: 260px; border-radius: 48px;
+    background: var(--brick-orange); position: relative;
+    box-shadow: 0 12px 0 #C78108, 0 28px 60px rgba(245,158,11,0.32);
+  }
+  .s3 .mascot::before, .s3 .mascot::after {
+    content: ""; position: absolute; top: 70px; width: 42px; height: 42px;
+    border-radius: 50%; background: var(--ink);
+  }
+  .s3 .mascot::before { left: 70px; }
+  .s3 .mascot::after  { right: 70px; }
+  .s3 .mouth {
+    position: absolute; bottom: 68px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 42px; border-radius: 0 0 40px 40px;
+    background: var(--ink);
+  }
+  .s3 .antenna {
+    position: absolute; top: -36px; left: 50%; transform: translateX(-50%);
+    width: 8px; height: 36px; background: var(--ink);
+  }
+  .s3 .antenna::after {
+    content: ""; position: absolute; top: -14px; left: -8px;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--brick-red);
+  }
+  .s3 .kicker {
+    font: 700 13px/1 var(--mono); letter-spacing: 0.22em;
+    color: var(--brick-red); text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .s3 h1 {
+    font-family: var(--serif); font-size: 116px; line-height: 0.96; letter-spacing: -0.04em;
+    color: var(--ink); margin: 0 0 26px; font-weight: 800;
+  }
+  .s3 h1 .accent { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s3 .tagline { font-size: 24px; line-height: 1.42; color: var(--ink-2); max-width: 760px; margin-bottom: 28px; font-weight: 500; }
+  .s3 .tagline em { font-style: italic; color: var(--brick-red); font-weight: 600; }
+  /* Larger, more legible chips. SVG dot replaces emoji so the look is consistent. */
+  .s3 .pipe {
+    display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .s3 .chip {
+    display: inline-flex; gap: 10px; align-items: center;
+    background: var(--card); border: 1px solid var(--rule);
+    padding: 10px 16px; border-radius: 999px;
+    font: 700 14px/1 var(--sans); color: var(--ink-2);
+    box-shadow: 0 2px 0 var(--rule-2);
+    min-height: 38px;
+  }
+  .s3 .chip svg { display: block; }
+  .s3 .arrow { font-size: 16px; color: var(--ink-4); margin: 0 2px; }
+
+  /* ──────────────────────────────── SLIDE 4 — TOUR (5 stages) ──────── */
+  .s4 .frame { justify-content: center; gap: 28px; }
+  .s4 h1 {
+    font-family: var(--serif); font-size: 80px; line-height: 1.02; letter-spacing: -0.035em;
+    color: var(--ink); text-align: center; max-width: 1400px; margin: 0 auto; font-weight: 800;
+  }
+  .s4 h1 .red { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s4 .sub {
+    text-align: center; font-size: 21px; line-height: 1.4; color: var(--ink-3);
+    max-width: 1100px; margin: 0 auto; font-weight: 500;
+  }
+  .s4 .thumbs {
+    display: grid;
+    /* Build is the showpiece — give it 1.4× the width of the others. */
+    grid-template-columns: 1fr 1fr 1.42fr 1fr 1fr;
+    gap: 18px;
+    max-width: 1440px; margin: 0 auto;
+  }
+  .s4 .thumb {
+    border-radius: 18px; padding: 24px 20px; min-height: 290px;
+    position: relative; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 10px 30px rgba(26,20,16,0.06);
+  }
+  .s4 .thumb .num {
+    font: 800 11px/1 var(--mono); letter-spacing: 0.18em;
+    opacity: 0.55; text-transform: uppercase;
+  }
+  .s4 .thumb h4 {
+    font-family: var(--serif); font-size: 28px; line-height: 1.05; letter-spacing: -0.02em; font-weight: 800;
+  }
+  .s4 .thumb p { font-size: 15px; line-height: 1.45; color: var(--ink-2); font-weight: 500; }
+  .s4 .thumb .ic { width: 36px; height: 36px; }
+  .s4 .thumb .ic svg { display: block; width: 100%; height: 100%; }
+
+  .s4 .t1 { background: #FFE0CC; }   /* discover */
+  .s4 .t2 { background: #FEE9CA; }   /* inventory */
+  .s4 .t3 {                           /* build (showpiece) */
+    background: linear-gradient(155deg, #FCE7F3 0%, #FFD6E5 100%);
+    border: 1.5px solid rgba(225,79,59,0.28);
+    box-shadow: 0 14px 40px rgba(225,79,59,0.14);
+  }
+  .s4 .t4 { background: #E6F4F1; }   /* learn */
+  .s4 .t5 { background: #F0E6FA; }   /* celebrate */
+  .s4 .thumb .tag {
+    margin-top: auto; font: 700 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .s4 .t1 .tag { color: var(--brick-red); }
+  .s4 .t2 .tag { color: var(--brick-orange); }
+  .s4 .t3 .tag { color: #9D174D; }
+  .s4 .t4 .tag { color: var(--ok); }
+  .s4 .t5 .tag { color: var(--violet); }
+  /* Showpiece ribbon — repositioned inside the card and stamped, not floating. */
+  .s4 .star {
+    display: inline-flex; align-items: center; gap: 6px;
+    align-self: flex-start;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--brick-red); color: #FFF;
+    font: 800 10px/1 var(--mono); letter-spacing: 0.18em; text-transform: uppercase;
+    box-shadow: 0 4px 10px rgba(225,79,59,0.32);
+  }
+
+  /* ──────────────────────────────── SLIDE 5 — THREE PILLARS ────────── */
+  .s5 .frame { justify-content: flex-start; }
+  .s5 .kicker { font: 700 13px/1 var(--mono); letter-spacing: 0.22em; color: var(--brick-red); text-transform: uppercase; }
+  .s5 h1 {
+    font-family: var(--serif); font-size: 76px; line-height: 1.0; letter-spacing: -0.035em;
+    color: var(--ink); margin-top: 14px; margin-bottom: 36px; font-weight: 800;
+    max-width: 1280px;
+  }
+  .s5 h1 .accent { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s5 .pillars {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 24px; flex: 1;
+  }
+  .s5 .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 22px;
+    padding: 36px 32px 32px; display: flex; flex-direction: column; gap: 16px;
+    box-shadow: 0 6px 24px rgba(26,20,16,0.05);
+  }
+  .s5 .card .num {
+    font: 800 12px/1 var(--mono); letter-spacing: 0.22em; color: var(--brick-red);
+  }
+  .s5 .card h3 {
+    font-family: var(--serif); font-size: 30px; line-height: 1.08; letter-spacing: -0.02em; font-weight: 800;
+  }
+  .s5 .card p { font-size: 16.5px; line-height: 1.5; color: var(--ink-2); font-weight: 500; }
+  .s5 .card .ic { width: 48px; height: 48px; }
+  .s5 .card .ic svg { width: 100%; height: 100%; display: block; }
+  /* Highlight the first pillar — that's the live-rewriting manual, the
+     central proof of the prototype. */
+  .s5 .card.lead {
+    background: linear-gradient(165deg, #FFF8F0 0%, #FFE0CC 100%);
+    border: 1.5px solid rgba(225,79,59,0.22);
+    box-shadow: 0 10px 32px rgba(225,79,59,0.10);
+  }
+
+  /* ──────────────────────────────── SLIDE 6 — TEAM + CLOSE + QR ────── */
+  .s6 .frame { justify-content: center; }
+  .s6 .wrap {
+    max-width: 1380px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+  }
+  .s6 .kicker { font: 700 13px/1 var(--mono); letter-spacing: 0.22em; color: var(--brick-red); text-transform: uppercase; }
+  .s6 h1 {
+    font-family: var(--serif); font-size: 92px; line-height: 0.98; letter-spacing: -0.035em;
+    color: var(--ink); margin: 18px 0 24px; font-weight: 800;
+  }
+  .s6 h1 .red { color: var(--brick-red); font-style: italic; font-weight: 500; }
+  .s6 .ask {
+    margin-top: 18px; padding: 18px 22px;
+    background: rgba(225,79,59,0.08); border: 1px solid rgba(225,79,59,0.22);
+    border-radius: 16px; display: grid; gap: 8px; max-width: 520px;
+  }
+  .s6 .ask .ask-kicker {
+    font: 800 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--brick-red); text-transform: uppercase;
+  }
+  .s6 .ask p { font-size: 16px; line-height: 1.45; color: var(--ink); font-weight: 500; }
+
+  .s6 .team { display: grid; gap: 18px; }
+  .s6 .member { display: flex; gap: 18px; align-items: flex-start; }
+  .s6 .avatar {
+    flex-shrink: 0; width: 72px; height: 72px; border-radius: 18px;
+    display: grid; place-items: center; font-family: var(--serif); font-weight: 800; font-size: 30px;
+    color: #FFF; box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+  }
+  .s6 .m1 .avatar { background: var(--brick-red); box-shadow: 0 4px 0 var(--brick-red-d); }
+  .s6 .m2 .avatar { background: var(--brick-blue); box-shadow: 0 4px 0 #1E4FC4; }
+  .s6 .member .info h4 { font-family: var(--serif); font-size: 24px; line-height: 1.2; margin-bottom: 4px; font-weight: 800; }
+  .s6 .member .role { font: 700 10px/1 var(--mono); letter-spacing: 0.20em; color: var(--ink-4); text-transform: uppercase; margin-bottom: 6px; }
+  .s6 .member p { font-size: 15px; line-height: 1.5; color: var(--ink-2); font-weight: 500; }
+
+  .s6 .qr-block {
+    margin-top: 18px;
+    display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center;
+    padding: 16px; background: var(--card); border: 1px solid var(--rule); border-radius: 18px;
+    max-width: 520px;
+    box-shadow: 0 8px 28px rgba(26,20,16,0.06);
+  }
+  .s6 .qr-block img {
+    width: 132px; height: 132px; border-radius: 8px; display: block;
+    image-rendering: pixelated;
+  }
+  .s6 .qr-block .qr-info { display: grid; gap: 4px; }
+  .s6 .qr-block .qr-cap { font: 800 10px/1 var(--mono); letter-spacing: 0.22em; color: var(--ink-4); text-transform: uppercase; }
+  .s6 .qr-block .qr-url {
+    font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--ink);
+  }
+  .s6 .qr-block .qr-sub {
+    font-size: 13px; color: var(--ink-3); line-height: 1.45; font-weight: 500;
+  }
+</style>
+
+<script>
+  // Slide routing: `?slide=N` or `#N` picks which slide is visible.
+  // build_video.py navigates with ?slide=<n> so each recording frame starts
+  // on the right deck, and we re-trigger entrance animations by toggling the
+  // .active class after a microtask.
+  function showSlide(n) {
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('slide-' + n);
+    if (!el) return;
+    void el.offsetWidth;     // force reflow so CSS animations restart
+    el.classList.add('active');
+  }
+  function pickSlide() {
+    const q = new URLSearchParams(location.search);
+    const n = q.get('slide') || (location.hash.slice(1) || '1');
+    showSlide(+n || 1);
+  }
+  window.addEventListener('DOMContentLoaded', pickSlide);
+  window.addEventListener('hashchange', pickSlide);
+</script>
+</head>
+
+<body>
+<div class="deck">
+
+  <!-- ══════════════════════════ SLIDE 1 — HOOK ══════════════════════════ -->
+  <section class="slide s1" id="slide-1">
+    <span class="brick br-red"></span>
+    <span class="brick br-blue"></span>
+    <span class="brick br-yellow"></span>
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>Investor Demo · 2026</div>
+      </div>
+      <div class="hero">
+        <div class="kicker anim anim-1">The problem</div>
+        <h1 class="anim anim-2">
+          A pile of bricks,<br/>and no <span class="accent">idea</span>.
+        </h1>
+        <!-- Manual <br/>s instead of letting the browser wrap "Twenty minutes" awkwardly. -->
+        <p class="sub anim anim-3">
+          A six-year-old tips a hundred shapes and colors onto the floor.<br/>
+          Twenty minutes later the booklet is upside-down, the build has stalled,<br/>
+          and the fun has turned into quiet frustration.
+        </p>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">01 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 2 — GAP ══════════════════════════ -->
+  <section class="slide s2" id="slide-2">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The gap</div>
+      </div>
+      <h1 class="anim anim-1">
+        The booklet is <span class="red">one-way</span>.
+      </h1>
+      <div class="grid">
+        <div class="card old anim anim-2">
+          <div class="cap">The paper manual</div>
+          <h3>Static. Stuck.</h3>
+          <ul>
+            <li>Can't see what bricks the child has on the floor</li>
+            <li>Can't answer a question</li>
+            <li>Can't recolor or rebuild on request</li>
+            <li>Only ever shows one "correct" model</li>
+          </ul>
+        </div>
+        <div class="arrow anim anim-3">→</div>
+        <div class="card new anim anim-4">
+          <div class="cap">What BrickBuddy adds</div>
+          <h3>Live and responsive.</h3>
+          <ul>
+            <li>Inventories the pile and recommends a build</li>
+            <li>Listens to "make it blue" and rewrites itself</li>
+            <li>Lets a tap recolor or remove one brick</li>
+            <li>Teaches STEAM grounded in what was just built</li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">02 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 3 — PRODUCT ══════════════════════════ -->
+  <section class="slide s3" id="slide-3">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The product</div>
+      </div>
+      <div class="hero">
+        <div class="mascot anim anim-1">
+          <span class="antenna"></span>
+          <span class="mouth"></span>
+        </div>
+        <div>
+          <div class="kicker anim anim-2">Meet BrickBuddy</div>
+          <h1 class="anim anim-2">A <span class="accent">living</span> manual.</h1>
+          <p class="tagline anim anim-3">
+            An AI building companion for six- to eight-year-olds. Show it the pile, pick a build,
+            then change colors, parts, and instructions by voice or tap — and the manual stays
+            <em>in&nbsp;sync</em>.
+          </p>
+          <div class="pipe anim anim-4">
+            <span class="chip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="1" y="3" width="14" height="10" rx="2" fill="#E14F3B"/>
+                <circle cx="8" cy="8" r="3" fill="#FFF6EC"/>
+                <circle cx="8" cy="8" r="1.5" fill="#E14F3B"/>
+              </svg>
+              Scan pile
+            </span>
+            <span class="arrow">→</span>
+            <span class="chip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="6" y="2" width="4" height="8" rx="2" fill="#2F6FEB"/>
+                <path d="M4 8.5a4 4 0 0 0 8 0" stroke="#2F6FEB" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="8" y1="12.5" x2="8" y2="14.5" stroke="#2F6FEB" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              Voice mods
+            </span>
+            <span class="arrow">→</span>
+            <span class="chip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M5 8 L5 4 a1.5 1.5 0 0 1 3 0 L8 8 L8 3 a1.5 1.5 0 0 1 3 0 L11 9 L13 9 a1 1 0 0 1 1 1 L14 12 a3 3 0 0 1-3 3 L7 15 a4 4 0 0 1-4-4 L3 9 Z" fill="#F59E0B"/>
+              </svg>
+              Tap a brick
+            </span>
+            <span class="arrow">→</span>
+            <span class="chip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="10" rx="1.5" fill="#10B981"/>
+                <line x1="8" y1="3" x2="8" y2="13" stroke="#FFF6EC" stroke-width="1"/>
+                <line x1="4" y1="6" x2="6.5" y2="6" stroke="#FFF6EC" stroke-width="1" stroke-linecap="round"/>
+                <line x1="4" y1="8" x2="6.5" y2="8" stroke="#FFF6EC" stroke-width="1" stroke-linecap="round"/>
+                <line x1="9.5" y1="6" x2="12" y2="6" stroke="#FFF6EC" stroke-width="1" stroke-linecap="round"/>
+                <line x1="9.5" y1="8" x2="12" y2="8" stroke="#FFF6EC" stroke-width="1" stroke-linecap="round"/>
+              </svg>
+              Live manual
+            </span>
+            <span class="arrow">→</span>
+            <span class="chip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" fill="#8357E6"/>
+                <path d="M5 6 Q8 3 11 6 Q11 9 8 11 Q5 9 5 6" fill="#FFF6EC"/>
+              </svg>
+              STEAM
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><div>FOR AGES 6–8 · WEB-BASED · NO INSTALL</div><div class="pageno">03 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 4 — TOUR (5 stages, Build is the showpiece) ══════════════ -->
+  <section class="slide s4" id="slide-4">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The tour</div>
+      </div>
+      <h1 class="anim anim-1">One simple <span class="red">path.</span></h1>
+      <p class="sub anim anim-2">
+        Discover what to build. Inventory the pile. Build it brick by brick.
+        Learn from it. Celebrate it. Voice or one tap does the heavy lifting.
+      </p>
+      <div class="thumbs">
+        <div class="thumb t1 anim anim-3">
+          <div class="ic">
+            <svg viewBox="0 0 36 36" fill="none">
+              <rect x="2" y="8" width="32" height="22" rx="4" fill="#E14F3B"/>
+              <circle cx="18" cy="19" r="6" fill="#FFF6EC"/>
+              <circle cx="18" cy="19" r="3.5" fill="#E14F3B"/>
+              <rect x="13" y="4" width="10" height="6" rx="1.5" fill="#E14F3B"/>
+            </svg>
+          </div>
+          <div class="num">Stage 1</div>
+          <h4>Discover</h4>
+          <p>Camera, voice, or just browse. Three doors, one flow.</p>
+          <div class="tag">CAMERA · VOICE</div>
+        </div>
+        <div class="thumb t2 anim anim-3">
+          <div class="ic">
+            <svg viewBox="0 0 36 36" fill="none">
+              <rect x="3" y="6" width="30" height="24" rx="3" fill="#FFF" stroke="#F59E0B" stroke-width="2"/>
+              <rect x="6" y="10" width="9" height="2.5" rx="1" fill="#F59E0B"/>
+              <rect x="6" y="15" width="14" height="2.5" rx="1" fill="#FBBF24"/>
+              <rect x="6" y="20" width="11" height="2.5" rx="1" fill="#10B981"/>
+              <rect x="6" y="25" width="13" height="2.5" rx="1" fill="#3B82F6"/>
+              <text x="26" y="13" fill="#1A1410" font-family="JetBrains Mono" font-size="6" font-weight="700">×12</text>
+              <text x="26" y="18" fill="#1A1410" font-family="JetBrains Mono" font-size="6" font-weight="700">×18</text>
+              <text x="26" y="23" fill="#1A1410" font-family="JetBrains Mono" font-size="6" font-weight="700">×8</text>
+              <text x="26" y="28" fill="#1A1410" font-family="JetBrains Mono" font-size="6" font-weight="700">×14</text>
+            </svg>
+          </div>
+          <div class="num">Stage 2</div>
+          <h4>Inventory</h4>
+          <p>Animated scan reveals brick counts and ranks matched builds.</p>
+          <div class="tag">SCAN · RECOMMEND</div>
+        </div>
+        <div class="thumb t3 anim anim-3">
+          <span class="star">★ Showpiece</span>
+          <div class="ic">
+            <svg viewBox="0 0 36 36" fill="none">
+              <rect x="2" y="6" width="14" height="24" rx="2" fill="#9D174D"/>
+              <rect x="4" y="9" width="3" height="3" fill="#FCE7F3"/>
+              <rect x="9" y="9" width="3" height="3" fill="#FCE7F3"/>
+              <rect x="4" y="14" width="8" height="1.5" fill="#FCE7F3"/>
+              <rect x="4" y="17" width="6" height="1.5" fill="#FCE7F3"/>
+              <rect x="20" y="6" width="14" height="24" rx="2" fill="#FCE7F3" stroke="#9D174D" stroke-width="1"/>
+              <rect x="22" y="10" width="10" height="1.5" fill="#9D174D"/>
+              <rect x="22" y="13" width="8" height="1.5" fill="#9D174D"/>
+              <rect x="22" y="16" width="9" height="1.5" fill="#9D174D"/>
+              <rect x="22" y="19" width="6" height="1.5" fill="#9D174D"/>
+              <circle cx="29" cy="25" r="2" fill="#E14F3B"/>
+            </svg>
+          </div>
+          <div class="num">Stage 3</div>
+          <h4>Build</h4>
+          <p>3D viewer + paper manual that rewrites itself when you say "make it blue" or tap a brick.</p>
+          <div class="tag">3D · VOICE · TAP</div>
+        </div>
+        <div class="thumb t4 anim anim-4">
+          <div class="ic">
+            <svg viewBox="0 0 36 36" fill="none">
+              <circle cx="18" cy="18" r="14" fill="#10B981"/>
+              <path d="M11 18 L16 13 L16 17 L25 17 L25 13 L30 18 L25 23 L25 19 L16 19 L16 23 Z" fill="#FFF6EC"/>
+            </svg>
+          </div>
+          <div class="num">Stage 4</div>
+          <h4>Learn</h4>
+          <p>Five STEAM topics + a quick quiz, all tied to the model just built.</p>
+          <div class="tag">STEAM · QUIZ</div>
+        </div>
+        <div class="thumb t5 anim anim-4">
+          <div class="ic">
+            <svg viewBox="0 0 36 36" fill="none">
+              <path d="M11 7 L11 16 a7 7 0 0 0 14 0 L25 7 Z" fill="#8357E6"/>
+              <rect x="6" y="6" width="6" height="3" rx="1" fill="#8357E6"/>
+              <rect x="24" y="6" width="6" height="3" rx="1" fill="#8357E6"/>
+              <rect x="14" y="22" width="8" height="2" fill="#8357E6"/>
+              <rect x="11" y="25" width="14" height="3" rx="0.5" fill="#8357E6"/>
+            </svg>
+          </div>
+          <div class="num">Stage 5</div>
+          <h4>Celebrate</h4>
+          <p>Confetti, 3D trophy, build report, and a printable certificate.</p>
+          <div class="tag">TROPHY · CERT</div>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY</div><div class="pageno">04 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 5 — THREE PILLARS ══════════════════════════ -->
+  <section class="slide s5" id="slide-5">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>What makes it work</div>
+      </div>
+      <div class="kicker anim anim-1">Three pillars</div>
+      <h1 class="anim anim-1">
+        One <span class="accent">model</span>, three honest claims.
+      </h1>
+      <div class="pillars">
+        <!-- Pillar 1: the lead. Highlighted because it's the proof of the prototype. -->
+        <div class="card lead anim anim-2">
+          <div class="ic">
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="6" y="10" width="14" height="28" rx="2" fill="#9D174D"/>
+              <rect x="9" y="14" width="3" height="3" fill="#FCE7F3"/>
+              <rect x="14" y="14" width="3" height="3" fill="#FCE7F3"/>
+              <rect x="9" y="20" width="8" height="2" fill="#FCE7F3"/>
+              <rect x="9" y="24" width="6" height="2" fill="#FCE7F3"/>
+              <rect x="9" y="28" width="7" height="2" fill="#FCE7F3"/>
+              <rect x="28" y="10" width="14" height="28" rx="2" fill="#FCE7F3" stroke="#9D174D" stroke-width="1.5"/>
+              <rect x="31" y="14" width="3" height="3" fill="#9D174D"/>
+              <rect x="36" y="14" width="3" height="3" fill="#9D174D"/>
+              <rect x="31" y="20" width="8" height="2" fill="#9D174D"/>
+              <rect x="31" y="24" width="6" height="2" fill="#9D174D"/>
+              <rect x="31" y="28" width="7" height="2" fill="#9D174D"/>
+              <path d="M22 24 L26 24 M24 22 L26 24 L24 26" stroke="#E14F3B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="num">01 · Living manual</div>
+          <h3>Model and manual share one source.</h3>
+          <p>Voice, tap, and structural edits all flow through a single mutation engine.
+            The 3D view, the printed manual, and the change log update from the same data —
+            never out of sync.</p>
+        </div>
+        <div class="card anim anim-3">
+          <div class="ic">
+            <svg viewBox="0 0 48 48" fill="none">
+              <rect x="6" y="6" width="14" height="10" rx="1.5" fill="#E14F3B"/>
+              <rect x="22" y="6" width="20" height="10" rx="1.5" fill="#3B82F6"/>
+              <rect x="6" y="20" width="20" height="10" rx="1.5" fill="#FBBF24"/>
+              <rect x="28" y="20" width="14" height="10" rx="1.5" fill="#10B981"/>
+              <rect x="6" y="34" width="36" height="8" rx="1.5" fill="#1F2937"/>
+            </svg>
+          </div>
+          <div class="num">02 · Declarative bricks</div>
+          <h3>Every brick is data.</h3>
+          <p>Models are stored as structured brick data. Inventory counts, manual steps,
+            and 3D rendering all read from the same source — so adding a new model means
+            adding one JSON file, not rewriting screens.</p>
+        </div>
+        <div class="card anim anim-4">
+          <div class="ic">
+            <svg viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="18" fill="none" stroke="#F59E0B" stroke-width="3"/>
+              <path d="M16 18 L16 26 a2 2 0 0 0 2 2 L30 28 a2 2 0 0 0 2 -2 L32 22 a2 2 0 0 0-2 -2 Z" fill="#F59E0B"/>
+              <circle cx="20" cy="32" r="2" fill="#F59E0B"/>
+              <circle cx="28" cy="32" r="2" fill="#F59E0B"/>
+              <line x1="24" y1="20" x2="24" y2="14" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="num">03 · Single web page</div>
+          <h3>Runs from a URL.</h3>
+          <p>Deploys to Cloudflare's edge as a single-page web app. No app store, no install,
+            no parent setup. Open the link, point a webcam, build something. It works on a
+            Chromebook in a school.</p>
+        </div>
+      </div>
+      <div class="foot"><div>BRICKBUDDY · DESIGN</div><div class="pageno">05 / 06</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ SLIDE 6 — TEAM + ASK + QR ══════════════════════════ -->
+  <section class="slide s6" id="slide-6">
+    <div class="frame">
+      <div class="top">
+        <div><span class="logo-dot"></span>BrickBuddy</div>
+        <div>The team · try it live</div>
+      </div>
+      <div class="wrap">
+        <div>
+          <div class="kicker anim anim-1">Built by</div>
+          <h1 class="anim anim-2">Two<br/>builders,<br/>one <span class="red">idea</span>.</h1>
+          <div class="ask anim anim-3">
+            <div class="ask-kicker">What we're looking for</div>
+            <p>Family testers, educator feedback, and visitors at the CMA exhibition.</p>
+          </div>
+        </div>
+        <div class="team">
+          <div class="member m1 anim anim-2">
+            <div class="avatar">Y</div>
+            <div class="info">
+              <h4>Yusong Huang</h4>
+              <div class="role">Implementation · Demo</div>
+              <p>Implementation, 3D pipeline, mutation engine, and Cloudflare deployment.</p>
+            </div>
+          </div>
+          <div class="member m2 anim anim-3">
+            <div class="avatar">J</div>
+            <div class="info">
+              <h4>Jiayi Huang</h4>
+              <div class="role">Concept · Research</div>
+              <p>Original concept, child research with ages 6–8, content, demo production.</p>
+            </div>
+          </div>
+          <div class="qr-block anim anim-4">
+            <img src="qr.png" alt="QR — try BrickBuddy live" />
+            <div class="qr-info">
+              <div class="qr-cap">Scan · try it live</div>
+              <div class="qr-url">brickbuddy.pages.dev</div>
+              <div class="qr-sub">Source on GitHub: Yusong-Enceladus/CMAA5043</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><div>THANK YOU FOR WATCHING · CMAA5043 · SPRING 2026</div><div class="pageno">06 / 06</div></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
