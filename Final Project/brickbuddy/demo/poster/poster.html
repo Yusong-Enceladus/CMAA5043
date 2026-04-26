@@ -190,9 +190,10 @@
     text-transform: uppercase;
   }
   .why {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm;
     flex: 1;
   }
+  .why .wcard p { font-size: 8pt; line-height: 1.4; color: var(--ink-2); }
   .why .wcard {
     background: var(--card); border: 0.4mm solid var(--rule); border-radius: 3mm;
     padding: 3mm 3.5mm; display: grid; gap: 0.7mm;
@@ -343,40 +344,25 @@
     </div>
   </div>
 
-  <!-- ── Why it ships ── -->
+  <!-- ── Why it ships — three pillars instead of six cards ── -->
   <div>
-    <div class="why-title">Six design decisions — the moat is the stack</div>
+    <div class="why-title">What makes it work · three honest claims</div>
   </div>
   <div class="why">
     <div class="wcard">
       <div class="ic">📖</div>
-      <h5>Living manual</h5>
-      <p>One mutation engine drives both 3D and printed manual. Voice, tap, structural — same source, never out of sync.</p>
-    </div>
-    <div class="wcard">
-      <div class="ic">⚡</div>
-      <h5>Local first</h5>
-      <p>Every voice and tap mod is parsed deterministically on-device. Zero LLM stalls, zero offline failure.</p>
+      <h5>Model and manual share one source</h5>
+      <p>Voice, tap, and structural edits flow through a single mutation engine. The 3D view, the printed manual, and the change log all read from the same data — never out of sync.</p>
     </div>
     <div class="wcard">
       <div class="ic">🧩</div>
-      <h5>Data bricks</h5>
-      <p>Models are declarative JSON. The same 3D pipeline renders any robot the child imagines tomorrow.</p>
-    </div>
-    <div class="wcard">
-      <div class="ic">🎯</div>
-      <h5>Region aware</h5>
-      <p>"Make the head purple" works because the parser knows aliases — head = snout = face. Voice scopes to a region; tap scopes to one brick.</p>
+      <h5>Every brick is data</h5>
+      <p>Models are stored as structured brick data. Inventory counts, manual steps, and 3D rendering all read from the same source — adding a model is one JSON file, not rewriting screens.</p>
     </div>
     <div class="wcard">
       <div class="ic">🪶</div>
-      <h5>Zero install</h5>
-      <p>A URL, a webcam, a microphone. Works on a Chromebook, iPad, or any laptop. Deploys to Cloudflare's edge.</p>
-    </div>
-    <div class="wcard">
-      <div class="ic">👶</div>
-      <h5>Six-year UX</h5>
-      <p>Big type, warm palette, always-visible mic, no hidden menus. Every screen is single-finger reachable.</p>
+      <h5>Runs from a URL</h5>
+      <p>Single-page web app on Cloudflare's edge. No app store, no install, no parent setup. Open the link, point a webcam, build something. Works on a Chromebook in a school.</p>
     </div>
   </div>
 

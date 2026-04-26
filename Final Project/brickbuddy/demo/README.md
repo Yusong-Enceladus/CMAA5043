@@ -64,10 +64,14 @@ genuinely new product category.
 
 ## How the video is made
 
-1. **TTS** — every segment in `segments.py` is rendered to a WAV with macOS
-   `say` (Samantha, 140 wpm, `[[slnc N]]` pauses between sentences). Provider
-   is swappable: edit `say_to_wav()` in `build_video.py` to route through
-   ElevenLabs / Cartesia / etc.
+1. **TTS — Bronya voice via myTTS (preferred), macOS `say` (fallback).**
+   Primary path is the local Qwen3-TTS install at
+   `~/Desktop/Creation/myTTS`, which clones a custom "Bronya" voice from a
+   ~30s reference take. Each segment in `segments.py` is rendered to a
+   loudness-normalized WAV with edge-fades, then HEAD_HOLD silence is
+   prepended for consistent timing. If myTTS isn't reachable, the build
+   falls back to macOS `say` (Samantha, 140 wpm, `[[slnc N]]` pauses).
+   Both paths are in `say_to_wav()` in `build_video.py`.
 2. **Record** — Playwright drives two targets:
    - `slides.html?slide=N` on `http://127.0.0.1:9011` for pitch slides
    - the **production** React bundle (`../../dist`) on `http://127.0.0.1:5184`

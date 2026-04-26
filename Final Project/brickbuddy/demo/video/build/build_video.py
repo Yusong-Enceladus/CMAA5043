@@ -67,9 +67,21 @@ PAD_SLIDE = 1.2   # sec of dead time to trim off the front of slide recordings
 PAD_PROTO = 2.2   # React + HMR needs a bit more time to paint
 TAIL_HOLD = 0.80  # extra video hold after narration so scenes breathe
 HEAD_HOLD = 0.40  # pre-roll silence before narration starts
-TTS_VOICE = "Samantha"
-TTS_RATE = 140
-SENTENCE_PAUSE = 380  # ms [[slnc N]] inserted between sentences
+
+# ── TTS pipeline ────────────────────────────────────────────────────────
+# Primary: myTTS — local Qwen3-TTS voice cloning of "Bronya" via the
+# MLX install at ~/Desktop/Creation/myTTS. Produces a much warmer, more
+# confident delivery than macOS `say` (Samantha). The pre-recorded
+# reference voice is in voices/bronya.wav.
+#
+# Fallback: macOS `say` Samantha @ 140 wpm. Only used if myTTS isn't
+# reachable (no install, missing venv) so the build never hard-fails.
+MYTTS_DIR    = pathlib.Path("/Users/bronya/Desktop/Creation/myTTS")
+MYTTS_PYTHON = MYTTS_DIR / "qwen3tts" / ".venv" / "bin" / "python"
+MYTTS_VOICE  = "bronya"
+SAY_VOICE = "Samantha"  # fallback only
+SAY_RATE  = 140         # fallback only
+SENTENCE_PAUSE = 380    # ms [[slnc N]] — only used by the `say` fallback
 PORT_SLIDES = 9011
 # Record against the PRODUCTION bundle (served from ../../dist) rather than
 # the Vite dev server. Vite HMR does weird things to R3F's zustand store in
@@ -100,27 +112,66 @@ def probe_duration(path):
     return float(json.loads(r.stdout)["format"]["duration"])
 
 
-def prep_tts_text(text):
-    """Insert [[slnc N]] pauses between sentences so Samantha breathes."""
+def prep_say_text(text):
+    """Insert [[slnc N]] pauses between sentences so Samantha breathes.
+    Only used by the `say` fallback path."""
     parts = re.split(r'(?<=[.!?])\s+', text.strip())
     pause = f"[[slnc {SENTENCE_PAUSE}]]"
     return f" {pause} ".join(p for p in parts if p)
 
 
-def say_to_wav(text, wav_path):
-    """Render narration to a WAV with HEAD_HOLD seconds of silence prepended."""
+def _prepend_silence(src_wav, dst_wav, silence_s):
+    """Prepend `silence_s` of digital silence to src_wav → dst_wav.
+    Used by both TTS paths so the narration always has the same lead-in,
+    regardless of which engine produced the audio."""
+    sh([FFMPEG, "-y", "-loglevel", "error",
+        "-f", "lavfi", "-t", f"{silence_s:.3f}", "-i", "anullsrc=r=44100:cl=stereo",
+        "-i", str(src_wav),
+        "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[a]",
+        "-map", "[a]", "-ar", "44100", "-ac", "2", str(dst_wav)])
+
+
+def _mytts_to_wav(text, wav_path):
+    """Render narration via myTTS (Qwen3-TTS Bronya voice).
+
+    Calls the MLX-backed CLI at ~/Desktop/Creation/myTTS. The output is
+    already loudness-normalized + edge-faded by myTTS's post-processing
+    pipeline, so we just prepend HEAD_HOLD silence to match `say`'s timing.
+    """
+    raw = wav_path.with_suffix(".raw.wav")
+    cmd = [
+        str(MYTTS_PYTHON), "generate.py",
+        "--voice", MYTTS_VOICE,
+        "--text", text,
+        "--output", str(raw),
+    ]
+    subprocess.run(cmd, cwd=str(MYTTS_DIR), check=True, capture_output=True, text=True)
+    _prepend_silence(raw, wav_path, HEAD_HOLD)
+    raw.unlink(missing_ok=True)
+
+
+def _say_to_wav(text, wav_path):
+    """Fallback: macOS `say`. Only invoked when myTTS isn't reachable."""
     aiff = wav_path.with_suffix(".aiff")
-    tts_text = prep_tts_text(text)
+    tts_text = prep_say_text(text)
     subprocess.run(
-        ["say", "-v", TTS_VOICE, "-r", str(TTS_RATE), "-o", str(aiff), tts_text],
+        ["say", "-v", SAY_VOICE, "-r", str(SAY_RATE), "-o", str(aiff), tts_text],
         check=True,
     )
-    sh(["ffmpeg", "-y", "-loglevel", "error",
-        "-f", "lavfi", "-t", f"{HEAD_HOLD:.3f}", "-i", "anullsrc=r=44100:cl=stereo",
-        "-i", str(aiff),
-        "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[a]",
-        "-map", "[a]", "-ar", "44100", "-ac", "2", str(wav_path)])
+    _prepend_silence(aiff, wav_path, HEAD_HOLD)
     aiff.unlink(missing_ok=True)
+
+
+def say_to_wav(text, wav_path):
+    """Render narration to a WAV using the best available TTS engine.
+    myTTS Bronya is preferred; macOS `say` is the fallback."""
+    if MYTTS_PYTHON.exists() and MYTTS_DIR.exists():
+        try:
+            _mytts_to_wav(text, wav_path)
+            return
+        except subprocess.CalledProcessError as e:
+            print(f"  [warn] myTTS failed, falling back to `say`: {e.stderr[:200] if e.stderr else e}")
+    _say_to_wav(text, wav_path)
 
 
 def start_server(dir_, port):
