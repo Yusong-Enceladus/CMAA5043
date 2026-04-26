@@ -1,0 +1,220 @@
+1
+00:00:00,400 --> 00:00:05,648
+A six-year-old tips a pile of bricks onto the floor. A hundred shapes, a hundred
+
+2
+00:00:05,648 --> 00:00:10,546
+colors, no idea what to build. Twenty minutes later the booklet is upside-down, the
+
+3
+00:00:10,546 --> 00:00:14,395
+build has stalled, and the fun has turned into quiet frustration.
+
+4
+00:00:15,595 --> 00:00:22,001
+The problem is not the bricks. It is the paper manual. It cannot see what bricks are
+
+5
+00:00:22,001 --> 00:00:27,277
+on the floor, answer a question, or adapt when a child changes their mind.
+
+6
+00:00:28,477 --> 00:00:33,394
+Meet BrickBuddy. An AI building companion for six- to eight-year-olds. Show it the
+
+7
+00:00:33,394 --> 00:00:39,446
+pile, pick a build, then change colors, parts, and instructions by voice or tap — and
+
+8
+00:00:39,446 --> 00:00:41,337
+the manual stays in sync.
+
+9
+00:00:42,537 --> 00:00:48,933
+One simple path. Discover, inventory, build, learn, celebrate. Voice or a single tap
+
+10
+00:00:48,933 --> 00:00:54,837
+does the heavy lifting. Here is the live prototype, end to end.
+
+11
+00:00:56,037 --> 00:00:59,435
+The home screen gives the child one job: show Buddy the bricks.
+
+12
+00:00:59,435 --> 00:01:01,700
+Tap Let's Build, and the Discover screen opens.
+
+13
+00:01:01,700 --> 00:01:05,382
+There's one main action — scan my pile — and two secondary doors.
+
+14
+00:01:05,382 --> 00:01:08,780
+The product never asks a six-year-old to fill in a text box.
+
+15
+00:01:08,780 --> 00:01:11,045
+We'll tell Buddy out loud what we have.
+
+16
+00:01:11,045 --> 00:01:15,293
+A scanning sweep crosses the pile. One row at a time, the inventory pops in.
+
+17
+00:01:15,293 --> 00:01:18,975
+Sixty-seven bricks across nine shapes, with color and count surfaced like a receipt.
+
+18
+00:01:18,975 --> 00:01:22,939
+Three matched recommendations slide in — each citing the bricks the kid actually has.
+
+19
+00:01:22,939 --> 00:01:24,355
+We'll pick the Robot Dog.
+
+20
+00:01:24,355 --> 00:01:25,771
+Here is the core screen.
+
+21
+00:01:25,771 --> 00:01:28,603
+On the left, the 3D dog grows brick by brick.
+
+22
+00:01:28,603 --> 00:01:30,302
+On the right, a paper-textured manual.
+
+23
+00:01:30,302 --> 00:01:34,267
+The current step on one page, the running list of changes on the other.
+
+24
+00:01:34,267 --> 00:01:38,231
+Right now the build is red. Watch the manual when the child changes it.
+
+25
+00:01:38,231 --> 00:01:39,930
+The child says: make it blue.
+
+26
+00:01:39,930 --> 00:01:43,045
+The 3D dog changes first. Then the manual changes with it.
+
+27
+00:01:43,045 --> 00:01:44,745
+Step text. Piece counts. Color swatches.
+
+28
+00:01:44,745 --> 00:01:47,860
+On the right page, Buddy stamps the edit: red to blue.
+
+29
+00:01:47,860 --> 00:01:50,125
+That is the thing paper can never do.
+
+30
+00:01:50,125 --> 00:01:50,975
+Voice isn't all-or-nothing.
+
+31
+00:01:50,975 --> 00:01:53,807
+Make the head purple — and only the head changes.
+
+32
+00:01:53,807 --> 00:01:56,355
+Body, legs, and tail stay exactly as they were.
+
+33
+00:01:56,355 --> 00:01:58,338
+For precision, pointing is faster than talking.
+
+34
+00:01:58,338 --> 00:02:01,169
+Tap the orange button, pick a brick, choose a swatch.
+
+35
+00:02:01,169 --> 00:02:04,284
+BrickBuddy updates that single piece, and the manual logs the edit.
+
+36
+00:02:04,284 --> 00:02:06,550
+The same engine handles preset structural changes too.
+
+37
+00:02:06,550 --> 00:02:07,399
+Say: add wings.
+
+38
+00:02:07,399 --> 00:02:11,930
+BrickBuddy adds a final step to the manual, and the 3D model grows the new parts.
+
+39
+00:02:11,930 --> 00:02:14,479
+After building, the session pivots from making to learning.
+
+40
+00:02:14,479 --> 00:02:18,444
+BrickBuddy turns the model into a lesson — stability, levers, sound, symmetry, and measurement.
+
+41
+00:02:18,444 --> 00:02:20,992
+All tied to the pieces the child just placed.
+
+42
+00:02:20,992 --> 00:02:22,975
+A two-question quiz closes the learning stage.
+
+43
+00:02:22,975 --> 00:02:26,090
+Right answers unlock an achievement. Wrong answers bring a friendlier explanation.
+
+44
+00:02:26,090 --> 00:02:27,222
+Every session ends here.
+
+45
+00:02:27,222 --> 00:02:32,037
+Confetti, a rotating 3D trophy, a build report, and a printable certificate to put on the fridge.
+
+46
+00:02:44,437 --> 00:02:49,857
+Three things make this prototype practical. First, one shared engine keeps the model
+
+47
+00:02:49,857 --> 00:02:55,277
+and manual in sync. Second, brick data is declarative — inventory, steps, and
+
+48
+00:02:55,277 --> 00:03:01,948
+rendering all read from the same source. Third, it runs as a single web page on
+
+49
+00:03:01,948 --> 00:03:05,701
+Cloudflare's edge. No install, no app store, no sign-up.
+
+50
+00:03:06,901 --> 00:03:14,327
+BrickBuddy is a CMAA5043 final project by Yusong Huang and Jiayi Huang. Yusong led the
+
+51
+00:03:14,327 --> 00:03:19,772
+implementation: every screen, the 3D pipeline, the mutation engine, and the
+
+52
+00:03:19,772 --> 00:03:26,208
+deployment. Jiayi led the original concept, the user research with children, and the
+
+53
+00:03:26,208 --> 00:03:27,198
+demo materials.
+
+54
+00:03:28,398 --> 00:03:34,404
+The prototype is live on Cloudflare's edge. Scan the code, try it in any browser, and
+
+55
+00:03:34,404 --> 00:03:38,158
+come find us at the CMA exhibition. Thanks for watching.
+
