@@ -89,4 +89,17 @@ function cloudflareApiDevPlugin() {
 export default defineConfig({
   plugins: [react(), cloudflareApiDevPlugin()],
   base: './',
+  // Force Vite to pre-bundle zustand + use-sync-external-store as ESM.
+  // Without this, @react-three/fiber's internal zustand store fails to init
+  // on React 19 because Vite serves a CJS shim without a default export,
+  // which silently kills the R3F render loop (canvas mounts but never draws).
+  optimizeDeps: {
+    include: [
+      'zustand',
+      'zustand/shallow',
+      'use-sync-external-store/shim',
+      'use-sync-external-store/shim/with-selector',
+      'use-sync-external-store/with-selector',
+    ],
+  },
 })

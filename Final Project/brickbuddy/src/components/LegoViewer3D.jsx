@@ -17,7 +17,7 @@
  * - size is the AXIS-ALIGNED bounding box BEFORE rotation.
  * - rotation is applied AROUND the center; geometry must be centered on its local origin.
  */
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, RoundedBox, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -199,7 +199,7 @@ function Wheel({ part }) {
 
 /* ── Dispatcher ─────────────────────────────────────────────────── */
 
-function Part({ part, isNew }) {
+function Part({ part, isNew, tapMode, onTap }) {
   let mesh;
   switch (part.type) {
     case 'brick':
@@ -222,10 +222,30 @@ function Part({ part, isNew }) {
     default:
       return null;
   }
+  // In tap-to-edit mode, every part is clickable. We bubble the click up
+  // with the part data + screen position so BuildScreen can pop a contextual
+  // edit menu next to where the kid actually tapped.
+  const groupProps = tapMode ? {
+    onClick: (e) => {
+      e.stopPropagation();
+      const ne = e.nativeEvent || e;
+      onTap?.(part, { x: ne.clientX, y: ne.clientY });
+    },
+    onPointerOver: (e) => {
+      e.stopPropagation();
+      if (typeof document !== 'undefined') document.body.style.cursor = 'pointer';
+    },
+    onPointerOut: () => {
+      if (typeof document !== 'undefined') document.body.style.cursor = '';
+    },
+  } : {};
+
   return (
-    <PulseGroup isNew={isNew} color={part.color}>
-      {mesh}
-    </PulseGroup>
+    <group {...groupProps}>
+      <PulseGroup isNew={isNew} color={part.color}>
+        {mesh}
+      </PulseGroup>
+    </group>
   );
 }
 
@@ -248,7 +268,7 @@ function AnnotationRing({ pos, color, r = 1.2 }) {
 
 /* ── Scene ──────────────────────────────────────────────────────── */
 
-function Scene({ model, currentStep, annotations }) {
+function Scene({ model, currentStep, annotations, tapMode, onPartTap }) {
   const { parts, newIds } = useMemo(() => {
     const acc = [];
     const newSet = new Set();
@@ -277,7 +297,13 @@ function Scene({ model, currentStep, annotations }) {
   return (
     <group position={[0, -center[1] * 0.5, 0]}>
       {parts.map((p) => (
-        <Part key={p._id} part={p} isNew={newIds.has(p._id)} />
+        <Part
+          key={p._id}
+          part={p}
+          isNew={newIds.has(p._id)}
+          tapMode={tapMode}
+          onTap={onPartTap}
+        />
       ))}
       {(annotations || []).map((a, i) => (
         <AnnotationRing
@@ -307,6 +333,8 @@ export default function LegoViewer3D({
   autoRotate = true,
   backgroundStyle = 'paper',
   showControls = true,
+  tapMode = false,
+  onPartClick,
 }) {
   const resolvedModel = useMemo(() => {
     if (model) return model;
@@ -315,7 +343,32 @@ export default function LegoViewer3D({
   }, [model, modelId]);
 
   const controlsRef = useRef(null);
+  const wrapRef = useRef(null);
   const [dist, setDist] = useState(14);
+  // Gate the Canvas on actually having a measurable size. R3F v9's internal
+  // ResizeObserver sometimes misses the first layout pass when the viewer is
+  // nested inside a flex/grid cell with minHeight:0 (Learn / Celebrate
+  // screens), leaving the canvas stuck at 300×150 and blank. Waiting for the
+  // wrapper to report ≥100px before mounting guarantees a clean init.
+  const [ready, setReady] = useState(false);
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let done = false;
+    const check = () => {
+      if (done) return;
+      const r = el.getBoundingClientRect();
+      if (r.width >= 60 && r.height >= 60) { done = true; setReady(true); }
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    // Fallback: after 400ms, mount regardless — if the container is still
+    // collapsed the Canvas will size itself via its own ResizeObserver once
+    // layout resolves.
+    const t = setTimeout(() => { done = true; setReady(true); }, 400);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, []);
 
   const applyDistance = useCallback((next) => {
     const clamped = Math.max(6, Math.min(36, next));
@@ -349,18 +402,22 @@ export default function LegoViewer3D({
 
   return (
     <div
+      ref={wrapRef}
       style={{
         width: '100%', height: '100%', minHeight: 260,
         borderRadius: 'inherit', overflow: 'hidden', position: 'relative',
         background: BG_STYLES[backgroundStyle] || BG_STYLES.paper,
       }}
     >
+      {ready && (
       <Canvas
         shadows
+        frameloop="always"
         dpr={[1, 2]}
         camera={{ position: [10, 7, 12], fov: 32 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         style={{ background: 'transparent' }}
+        onCreated={({ invalidate }) => invalidate()}
       >
         <directionalLight
           position={[7, 12, 6]}
@@ -378,7 +435,13 @@ export default function LegoViewer3D({
         <directionalLight position={[0, 2, -10]} intensity={0.35} color="#FDBA74" />
         <ambientLight intensity={0.55} />
 
-        <Scene model={resolvedModel} currentStep={currentStep} annotations={annotations} />
+        <Scene
+          model={resolvedModel}
+          currentStep={currentStep}
+          annotations={annotations}
+          tapMode={tapMode}
+          onPartTap={onPartClick}
+        />
 
         <ContactShadows
           position={[0, -0.1, 0]}
@@ -397,11 +460,12 @@ export default function LegoViewer3D({
           maxDistance={36}
           minPolarAngle={0.25}
           maxPolarAngle={Math.PI / 2.1}
-          autoRotate={autoRotate}
+          autoRotate={autoRotate && !tapMode}
           autoRotateSpeed={0.9}
           target={[0, 1.5, 0]}
         />
       </Canvas>
+      )}
 
       {showControls && (
         <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'grid', gap: 6, zIndex: 5 }}>

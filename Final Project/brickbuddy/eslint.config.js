@@ -26,4 +26,21 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  // Vite config + functions/* run on Node, not in the browser. Give them
+  // node globals so `Buffer` / `process` / `fetch` aren't flagged.
+  {
+    files: ['vite.config.js', 'functions/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  // App.jsx and BuildContext.jsx legitimately export both a component AND
+  // shared constants/hooks (STAGES, useBuild). Fast-refresh warns about
+  // mixed exports — that's fine here, suppress for these two files only.
+  {
+    files: ['src/App.jsx', 'src/context/BuildContext.jsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

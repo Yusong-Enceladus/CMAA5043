@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Week 11 Design Activity — TUI Analysis: LEGO Mindstorms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1B1D29;
+    --ink-soft: #4A4E66;
+    --muted: #7C8299;
+    --bg: #F4F4F0;
+    --card: #FFFFFF;
+    --line: #E5E2D6;
+    --p: #FF6B35;       /* physical — orange */
+    --p-soft: #FFE8DE;
+    --d: #4ECDC4;       /* digital — teal */
+    --d-soft: #DFF6F4;
+    --m: #A855F7;       /* mapping — purple */
+    --m-soft: #F0E4FF;
+    --accent: #FFD93D;
+    --shadow: 0 4px 24px rgba(27,29,41,0.06);
+    --shadow-lg: 0 12px 40px rgba(27,29,41,0.10);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { font-family:'Inter', system-ui, sans-serif; color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased; line-height:1.55; }
+  body { background-image:
+    linear-gradient(rgba(27,29,41,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,29,41,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* ---------- Figma-style top bar ---------- */
+  .topbar {
+    position: sticky; top:0; z-index:50;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom:1px solid var(--line);
+    padding: 12px 28px;
+    display:flex; align-items:center; gap:16px;
+    font-size: 13px;
+  }
+  .topbar .crumbs { color:var(--muted); display:flex; gap:8px; align-items:center; font-weight:500; }
+  .topbar .crumbs b { color:var(--ink); font-weight:600; }
+  .topbar .meta { margin-left:auto; display:flex; gap:10px; align-items:center; }
+  .pill { border:1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size:12px; color:var(--ink-soft); background:var(--card); font-weight:500; }
+  .pill .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--p); margin-right:6px; vertical-align:middle; }
+
+  /* ---------- Canvas ---------- */
+  main { max-width: 1240px; margin: 0 auto; padding: 48px 28px 96px; }
+
+  /* ---------- Hero ---------- */
+  .hero { margin-bottom: 48px; }
+  .hero .eyebrow {
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:12px;
+  }
+  .hero h1 {
+    font-family:'Fredoka', sans-serif; font-weight:700;
+    font-size: clamp(32px, 5vw, 56px); line-height:1.05; letter-spacing:-0.02em;
+  }
+  .hero h1 .u { background: linear-gradient(180deg, transparent 62%, var(--accent) 62%); padding:0 4px; }
+  .hero p.sub {
+    margin-top:16px; max-width: 780px; color:var(--ink-soft); font-size:18px;
+  }
+  .hero .tags { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; }
+  .tag { font-size:12px; padding:6px 12px; border-radius:999px; background:var(--card); border:1px solid var(--line); font-weight:500; color:var(--ink-soft); }
+  .tag.p { background:var(--p-soft); color:#B34418; border-color:transparent; }
+  .tag.d { background:var(--d-soft); color:#14807A; border-color:transparent; }
+  .tag.m { background:var(--m-soft); color:#6B21A8; border-color:transparent; }
+
+  /* ---------- Section card frame ---------- */
+  .frame {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 32px;
+    margin-bottom: 28px;
+    position:relative;
+  }
+  .frame.annotate::before {
+    content: attr(data-label);
+    position:absolute; top:-10px; left:24px;
+    background: var(--card);
+    border:1px solid var(--line);
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    color:var(--muted); letter-spacing:0.08em;
+  }
+
+  h2.section-title {
+    font-family:'Fredoka', sans-serif; font-weight:700;
+    font-size: 28px; letter-spacing:-0.01em;
+    display:flex; align-items:center; gap:12px;
+    margin-bottom: 8px;
+  }
+  h2 .chip {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:10px; font-size:16px;
+    font-family:'JetBrains Mono', monospace; font-weight:600;
+  }
+  h2.p .chip { background:var(--p-soft); color:#B34418; }
+  h2.d .chip { background:var(--d-soft); color:#14807A; }
+  h2.m .chip { background:var(--m-soft); color:#6B21A8; }
+  .section-subtitle { color:var(--muted); font-size:14px; margin-bottom: 24px; }
+
+  /* ---------- Annotated diagram ---------- */
+  .diagram {
+    position:relative;
+    background: linear-gradient(180deg, #FAFAF4 0%, #F4F4F0 100%);
+    border-radius: 14px;
+    border: 1px dashed var(--line);
+    padding: 40px;
+    margin: 20px 0 32px;
+    min-height: 520px;
+  }
+  .diagram-label {
+    position:absolute; top:14px; left:20px;
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    color:var(--muted); letter-spacing:0.1em;
+  }
+  .diagram-ruler {
+    position:absolute; top:14px; right:20px;
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    color:var(--muted);
+  }
+
+  /* ---------- Callout cards ---------- */
+  .callout-grid {
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .callout {
+    background: var(--card);
+    border:1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    position:relative;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .callout:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .callout .num {
+    position:absolute; top:-10px; left:-10px;
+    width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:600;
+    color:#fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .callout.p .num { background: var(--p); }
+  .callout.d .num { background: var(--d); }
+  .callout.m .num { background: var(--m); }
+  .callout h3 {
+    font-family:'Fredoka', sans-serif; font-weight:600;
+    font-size: 17px; margin-bottom: 6px;
+  }
+  .callout .kind {
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .callout p { font-size:14px; color:var(--ink-soft); }
+  .callout .attrs { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+  .callout .attr { font-size:11px; padding:3px 8px; border-radius:999px; background:var(--bg); color:var(--ink-soft); }
+  .callout.p .attr { background:var(--p-soft); color:#B34418; }
+  .callout.d .attr { background:var(--d-soft); color:#14807A; }
+  .callout.m .attr { background:var(--m-soft); color:#6B21A8; }
+
+  /* ---------- Mapping rows ---------- */
+  .map-row {
+    display:grid; grid-template-columns: 1fr 80px 1fr;
+    align-items:center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .map-row:last-child { border-bottom: none; }
+  .map-side {
+    padding: 14px 16px; border-radius: 10px; font-size:14px;
+  }
+  .map-side.phys { background:var(--p-soft); color:#7A2D0F; }
+  .map-side.dig { background:var(--d-soft); color:#0D544F; }
+  .map-side b { display:block; font-size:13px; font-family:'JetBrains Mono', monospace; margin-bottom:2px; font-weight:600; letter-spacing:0.02em; }
+  .map-arrow { text-align:center; font-size:22px; color:var(--m); font-weight:600; }
+  .map-arrow span { display:block; font-size:10px; color:var(--muted); font-family:'JetBrains Mono', monospace; margin-top:2px; letter-spacing:0.1em; }
+
+  /* ---------- Reflection block ---------- */
+  .reflect {
+    background: linear-gradient(135deg, #1B1D29 0%, #2E3047 100%);
+    color:#fff;
+    border-radius: 18px;
+    padding: 40px;
+    box-shadow: var(--shadow-lg);
+  }
+  .reflect h2 {
+    font-family:'Fredoka', sans-serif; font-weight:700; font-size:28px;
+    margin-bottom: 20px; letter-spacing:-0.01em;
+  }
+  .reflect h2 .chip { background: rgba(255,217,61,0.2); color: var(--accent); }
+  .reflect .grid {
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px; margin-top: 28px;
+  }
+  .reflect .box {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 20px;
+  }
+  .reflect .box b {
+    color: var(--accent); font-family:'Fredoka', sans-serif; font-size:16px; font-weight:600;
+    display:block; margin-bottom:8px;
+  }
+  .reflect .box p { color: rgba(255,255,255,0.8); font-size:14px; line-height:1.6; }
+
+  /* ---------- SVG diagram styling ---------- */
+  svg.ev3 { width:100%; height:auto; max-height: 520px; display:block; }
+  svg .brick-body { fill:#2E3047; }
+  svg .brick-accent { fill:#FF6B35; }
+  svg .screen { fill:#9DD3D0; stroke:#1B1D29; stroke-width:2; }
+  svg .btn { fill:#2D2F40; stroke:#555; stroke-width:1; }
+  svg .btn-center { fill:#FF6B35; }
+  svg .port { fill:#1B1D29; stroke:#FF6B35; stroke-width:1.5; }
+  svg .label {
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    fill:#1B1D29; font-weight:500;
+  }
+  svg .label-num {
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    font-weight:600; fill:#fff;
+  }
+  svg .annotation-line { stroke:#A855F7; stroke-width:1.2; stroke-dasharray: 4 4; fill:none; }
+  svg .cable { stroke:#FF6B35; stroke-width:2.5; fill:none; }
+
+  footer {
+    margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 13px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px;
+  }
+  footer a { color: var(--ink-soft); text-decoration: none; border-bottom: 1px solid var(--line); }
+  footer a:hover { color: var(--p); border-color: var(--p); }
+
+  @media (max-width: 720px) {
+    .map-row { grid-template-columns: 1fr; }
+    .map-arrow { transform: rotate(90deg); padding: 4px 0; }
+    .frame { padding: 24px 20px; }
+    .diagram { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crumbs">
+    <span>CMAA5043</span> <span>/</span>
+    <span>Creative Prototyping</span> <span>/</span>
+    <b>Week 11 — TUI Analysis</b>
+  </div>
+  <div class="meta">
+    <span class="pill"><span class="dot"></span>Design Activity #11</span>
+    <span class="pill">Yusong Huang</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow">Week 11 · Design Activity · Tangible User Interface</div>
+    <h1>LEGO Mindstorms EV3<br>
+      <span class="u">a brick you build, a brick that thinks.</span>
+    </h1>
+    <p class="sub">
+      A tangible programming system where snap-together Technic parts become the body, and a block-based
+      editor becomes the mind. This analysis breaks down its <b>physical</b>, <b>digital</b>, and
+      <b>mapping</b> layers — and shows how each side makes the other richer.
+    </p>
+    <div class="tags">
+      <span class="tag">TUI</span>
+      <span class="tag p">Physical: bricks · motors · sensors</span>
+      <span class="tag d">Digital: block-based IDE · firmware</span>
+      <span class="tag m">Mapping: port → icon · degree → variable</span>
+    </div>
+  </section>
+
+  <!-- DIAGRAM -->
+  <section class="frame annotate" data-label="FRAME · 01 · Annotated Diagram">
+    <h2 class="section-title p"><span class="chip">◇</span>Annotated Diagram</h2>
+    <div class="section-subtitle">
+      Numbered callouts follow the three analysis layers: <b style="color:var(--p)">orange = physical</b>,
+      <b style="color:var(--d)">teal = digital</b>, <b style="color:var(--m)">purple = mapping</b>.
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-label">FIG. 1 — EV3 INTELLIGENT BRICK + PERIPHERALS</div>
+      <div class="diagram-ruler">1:1 · annotated</div>
+
+      <svg class="ev3" viewBox="0 0 1100 520" xmlns="http://www.w3.org/2000/svg">
+        <!-- ====== EV3 BRICK (center) ====== -->
+        <g transform="translate(420,120)">
+          <!-- body -->
+          <rect class="brick-body" x="0" y="0" width="260" height="260" rx="14"/>
+          <!-- top accent strip -->
+          <rect class="brick-accent" x="10" y="10" width="240" height="16" rx="4"/>
+          <text x="130" y="23" text-anchor="middle" fill="#fff" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600" letter-spacing="2">LEGO MINDSTORMS EV3</text>
+
+          <!-- LCD screen -->
+          <rect class="screen" x="30" y="44" width="200" height="70" rx="4"/>
+          <text x="130" y="70" text-anchor="middle" fill="#1B1D29" font-family="JetBrains Mono, monospace" font-size="10" font-weight="600">▶ run MyProgram</text>
+          <text x="130" y="86" text-anchor="middle" fill="#1B1D29" font-family="JetBrains Mono, monospace" font-size="9">Port 1: touch · 0</text>
+          <text x="130" y="100" text-anchor="middle" fill="#1B1D29" font-family="JetBrains Mono, monospace" font-size="9">Port 4: US · 24 cm</text>
+
+          <!-- buttons cluster -->
+          <circle class="btn btn-center" cx="130" cy="170" r="18"/>
+          <circle class="btn" cx="130" cy="135" r="12"/>
+          <circle class="btn" cx="130" cy="205" r="12"/>
+          <circle class="btn" cx="95"  cy="170" r="12"/>
+          <circle class="btn" cx="165" cy="170" r="12"/>
+          <rect  class="btn" x="42" y="158" width="24" height="24" rx="4"/>
+          <text x="54" y="173" text-anchor="middle" fill="#fff" font-size="10" font-family="JetBrains Mono, monospace">✕</text>
+
+          <!-- input ports (top) -->
+          <rect class="port" x="10"  y="-20" width="40" height="18" rx="3"/>
+          <rect class="port" x="70"  y="-20" width="40" height="18" rx="3"/>
+          <rect class="port" x="150" y="-20" width="40" height="18" rx="3"/>
+          <rect class="port" x="210" y="-20" width="40" height="18" rx="3"/>
+          <text x="30"  y="-6" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">1</text>
+          <text x="90"  y="-6" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">2</text>
+          <text x="170" y="-6" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">3</text>
+          <text x="230" y="-6" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">4</text>
+
+          <!-- output ports (bottom) -->
+          <rect class="port" x="10"  y="240" width="40" height="18" rx="3"/>
+          <rect class="port" x="70"  y="240" width="40" height="18" rx="3"/>
+          <rect class="port" x="150" y="240" width="40" height="18" rx="3"/>
+          <rect class="port" x="210" y="240" width="40" height="18" rx="3"/>
+          <text x="30"  y="253" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">A</text>
+          <text x="90"  y="253" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">B</text>
+          <text x="170" y="253" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">C</text>
+          <text x="230" y="253" text-anchor="middle" fill="#fff" font-size="9" font-family="JetBrains Mono, monospace">D</text>
+
+          <!-- stud bumps (LEGO) -->
+          <g fill="#3D3F52">
+            <circle cx="30"  cy="230" r="3"/><circle cx="60"  cy="230" r="3"/>
+            <circle cx="200" cy="230" r="3"/><circle cx="230" cy="230" r="3"/>
+          </g>
+        </g>
+
+        <!-- ====== Touch sensor (left) ====== -->
+        <g transform="translate(80,180)">
+          <rect fill="#F94144" x="0" y="20" width="90" height="42" rx="5"/>
+          <circle cx="18" cy="41" r="10" fill="#fff" stroke="#1B1D29" stroke-width="2"/>
+          <text x="55" y="46" fill="#fff" font-size="10" font-family="JetBrains Mono, monospace">TOUCH</text>
+        </g>
+        <path class="cable" d="M 170 215 Q 280 230 420 190"/>
+
+        <!-- ====== Ultrasonic (top right) ====== -->
+        <g transform="translate(820,110)">
+          <rect fill="#F1FAEE" x="0" y="0" width="100" height="60" rx="5" stroke="#1B1D29" stroke-width="1.5"/>
+          <circle cx="28" cy="30" r="14" fill="#A8DADC" stroke="#1B1D29" stroke-width="1.5"/>
+          <circle cx="72" cy="30" r="14" fill="#A8DADC" stroke="#1B1D29" stroke-width="1.5"/>
+          <circle cx="28" cy="30" r="5" fill="#1B1D29"/>
+          <circle cx="72" cy="30" r="5" fill="#1B1D29"/>
+          <text x="50" y="55" text-anchor="middle" fill="#1B1D29" font-size="9" font-family="JetBrains Mono, monospace">US SENSOR</text>
+        </g>
+        <path class="cable" d="M 820 140 Q 760 160 670 130"/>
+
+        <!-- ====== Color sensor (bottom right) ====== -->
+        <g transform="translate(830,340)">
+          <rect fill="#FFD93D" x="0" y="0" width="90" height="50" rx="5" stroke="#1B1D29" stroke-width="1.5"/>
+          <circle cx="45" cy="24" r="12" fill="#1B1D29"/>
+          <circle cx="45" cy="24" r="6" fill="#F94144"/>
+          <text x="45" y="45" text-anchor="middle" fill="#1B1D29" font-size="9" font-family="JetBrains Mono, monospace">COLOR</text>
+        </g>
+        <path class="cable" d="M 830 360 Q 760 350 680 360"/>
+
+        <!-- ====== Large motor (bottom left) ====== -->
+        <g transform="translate(80,340)">
+          <rect fill="#E5E2D6" x="0" y="0" width="110" height="60" rx="6" stroke="#1B1D29" stroke-width="1.5"/>
+          <circle cx="92" cy="30" r="22" fill="#1B1D29"/>
+          <circle cx="92" cy="30" r="14" fill="#FF6B35"/>
+          <rect fill="#FF6B35" x="0" y="0" width="110" height="12" rx="3"/>
+          <text x="50" y="9" text-anchor="middle" fill="#fff" font-size="8" font-family="JetBrains Mono, monospace" font-weight="600">LARGE MOTOR</text>
+        </g>
+        <path class="cable" d="M 180 360 Q 280 370 420 380"/>
+
+        <!-- ====== Numbered callout markers ====== -->
+        <!-- 1: Intelligent Brick -->
+        <circle cx="550" cy="250" r="14" fill="#FF6B35"/>
+        <text class="label-num" x="550" y="254" text-anchor="middle">1</text>
+        <!-- 2: Touch -->
+        <circle cx="110" cy="208" r="14" fill="#FF6B35"/>
+        <text class="label-num" x="110" y="212" text-anchor="middle">2</text>
+        <!-- 3: Ultrasonic -->
+        <circle cx="870" cy="140" r="14" fill="#FF6B35"/>
+        <text class="label-num" x="870" y="144" text-anchor="middle">3</text>
+        <!-- 4: Color -->
+        <circle cx="875" cy="365" r="14" fill="#FF6B35"/>
+        <text class="label-num" x="875" y="369" text-anchor="middle">4</text>
+        <!-- 5: Motor -->
+        <circle cx="135" cy="370" r="14" fill="#FF6B35"/>
+        <text class="label-num" x="135" y="374" text-anchor="middle">5</text>
+        <!-- 6: Screen (digital) -->
+        <circle cx="470" cy="170" r="14" fill="#4ECDC4"/>
+        <text class="label-num" x="470" y="174" text-anchor="middle">6</text>
+        <!-- 7: Port (mapping) -->
+        <circle cx="500" cy="108" r="14" fill="#A855F7"/>
+        <text class="label-num" x="500" y="112" text-anchor="middle">7</text>
+        <!-- 8: Cable (mapping) -->
+        <circle cx="300" cy="230" r="14" fill="#A855F7"/>
+        <text class="label-num" x="300" y="234" text-anchor="middle">8</text>
+
+        <!-- Annotation dashed lines to edges -->
+        <path class="annotation-line" d="M 500 108 Q 470 60 420 40"/>
+        <text class="label" x="260" y="34">digital port ID → icon in IDE</text>
+
+        <path class="annotation-line" d="M 300 230 Q 320 90 450 50"/>
+
+        <!-- Section legend -->
+        <g transform="translate(40,40)">
+          <rect fill="#fff" stroke="#E5E2D6" x="0" y="0" width="180" height="82" rx="8"/>
+          <text class="label" x="14" y="20" font-weight="600">LEGEND</text>
+          <circle cx="24" cy="38" r="5" fill="#FF6B35"/>
+          <text class="label" x="36" y="42">physical component</text>
+          <circle cx="24" cy="56" r="5" fill="#4ECDC4"/>
+          <text class="label" x="36" y="60">digital component</text>
+          <circle cx="24" cy="74" r="5" fill="#A855F7"/>
+          <text class="label" x="36" y="78">mapping / connection</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION 1 — PHYSICAL COMPONENTS
+  ========================================================= -->
+  <section class="frame annotate" data-label="FRAME · 02 · Physical Layer">
+    <h2 class="section-title p"><span class="chip">01</span>Physical Components</h2>
+    <div class="section-subtitle">
+      Characteristics · functions · affordances · user interactions — the body you can touch, rotate, and snap together.
+    </div>
+
+    <div class="callout-grid">
+
+      <div class="callout p">
+        <div class="num">1</div>
+        <div class="kind">Hub · ABS plastic · 180 g</div>
+        <h3>EV3 Intelligent Brick</h3>
+        <p>
+          A rectangular, stud-topped brick housing an ARM9 CPU, 64 MB RAM, LCD screen, speaker, six
+          rubber navigation buttons, a micro-SD slot, and eight color-coded RJ-12 ports.
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: buttons invite pressing</span>
+          <span class="attr">Stud-top invites stacking</span>
+          <span class="attr">Shape reads “computer-brick”</span>
+        </div>
+      </div>
+
+      <div class="callout p">
+        <div class="num">2</div>
+        <div class="kind">Input · digital on/off</div>
+        <h3>Touch Sensor</h3>
+        <p>
+          A red plastic button protruding from a rectangular Technic-compatible housing. Users
+          physically press it, or let the robot bump into a wall as a contact switch.
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: the red dome asks to be pushed</span>
+          <span class="attr">Used as: bumper · button · trigger</span>
+        </div>
+      </div>
+
+      <div class="callout p">
+        <div class="num">3</div>
+        <div class="kind">Input · analog range</div>
+        <h3>Ultrasonic Sensor</h3>
+        <p>
+          Two circular transducers that look like eyes — one emits, one receives ultrasound. Reads
+          the distance to the nearest object in centimeters (3–250 cm).
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: eyes → “I see forward”</span>
+          <span class="attr">Directionality is visually obvious</span>
+        </div>
+      </div>
+
+      <div class="callout p">
+        <div class="num">4</div>
+        <div class="kind">Input · reflected light</div>
+        <h3>Color Sensor</h3>
+        <p>
+          A downward-facing lens with a tiny red LED. Reads reflected light (0–100%) or classifies
+          seven named colors when placed near a surface.
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: lens → “point at something”</span>
+          <span class="attr">LED invites scanning</span>
+        </div>
+      </div>
+
+      <div class="callout p">
+        <div class="num">5</div>
+        <div class="kind">Output · rotary actuator</div>
+        <h3>Large Motor</h3>
+        <p>
+          A geared DC motor with a built-in rotation encoder (1° resolution). An exposed orange
+          cross-axle hub invites wheels, gears, or arms to be attached directly.
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: cross-axle → “attach a wheel here”</span>
+          <span class="attr">Bi-directional · torque + position feedback</span>
+        </div>
+      </div>
+
+      <div class="callout p">
+        <div class="num">+</div>
+        <div class="kind">Structure · LEGO Technic</div>
+        <h3>Beams, Pins, Axles, Gears, Wheels</h3>
+        <p>
+          Thousands of interchangeable Technic parts form the body. Holes invite pins, pins invite
+          beams, axles invite gears — the grammar is visible at a glance.
+        </p>
+        <div class="attrs">
+          <span class="attr">Affordance: hole = pin socket</span>
+          <span class="attr">Modular · self-documenting</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px; padding:20px; background:var(--p-soft); border-left:4px solid var(--p); border-radius:8px;">
+      <b style="color:#B34418; font-family:'Fredoka',sans-serif;">User interactions (physical):</b>
+      <span style="color:#7A2D0F;">
+        build a chassis by pressing bricks together · plug color-coded cables into ports · press
+        center button to navigate the on-brick menu · manually rotate a motor to test backlash ·
+        place sensors facing the world they will observe.
+      </span>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION 2 — DIGITAL COMPONENTS
+  ========================================================= -->
+  <section class="frame annotate" data-label="FRAME · 03 · Digital Layer">
+    <h2 class="section-title d"><span class="chip">02</span>Digital Components</h2>
+    <div class="section-subtitle">
+      Firmware, editor, and data — the mind that gives the body purpose.
+    </div>
+
+    <div class="callout-grid">
+
+      <div class="callout d">
+        <div class="num">A</div>
+        <div class="kind">Runtime · on-brick</div>
+        <h3>EV3 Firmware (Linux-based)</h3>
+        <p>
+          The on-brick OS boots, reads attached peripherals via the port bus, runs user programs,
+          and handles Bluetooth / USB communication back to the computer.
+        </p>
+        <div class="attrs">
+          <span class="attr">Hot-plug sensor detection</span>
+          <span class="attr">Program scheduler</span>
+        </div>
+      </div>
+
+      <div class="callout d">
+        <div class="num">B</div>
+        <div class="kind">IDE · desktop + tablet</div>
+        <h3>EV3 Programming Environment</h3>
+        <p>
+          A block-based visual editor where programs read left-to-right as chains of colored
+          blocks — green for actions, orange for flow control, yellow for sensors.
+        </p>
+        <div class="attrs">
+          <span class="attr">Drag-and-drop</span>
+          <span class="attr">Typed block connectors (wires)</span>
+          <span class="attr">Live monitoring</span>
+        </div>
+      </div>
+
+      <div class="callout d">
+        <div class="num">6</div>
+        <div class="kind">UI · on-brick LCD</div>
+        <h3>Brick Display & Port View</h3>
+        <p>
+          A 178×128 monochrome screen showing the file menu, currently running program, and
+          real-time readings from every attached sensor port.
+        </p>
+        <div class="attrs">
+          <span class="attr">Live feedback · no computer needed</span>
+          <span class="attr">Self-describing</span>
+        </div>
+      </div>
+
+      <div class="callout d">
+        <div class="num">C</div>
+        <div class="kind">Data · structured</div>
+        <h3>Program Blocks & Variables</h3>
+        <p>
+          Each physical action has a canonical block: <i>Large Motor</i>, <i>Wait for Color</i>,
+          <i>Switch on US Distance</i>. Numerical sensor data flows between blocks as typed wires.
+        </p>
+        <div class="attrs">
+          <span class="attr">Degrees · cm · ° · %</span>
+          <span class="attr">Typed data wires</span>
+        </div>
+      </div>
+
+      <div class="callout d">
+        <div class="num">D</div>
+        <div class="kind">Network · wireless</div>
+        <h3>Bluetooth / Wi-Fi Bridge</h3>
+        <p>
+          The brick broadcasts live telemetry — sensor values, program state, motor position — to
+          the IDE, so the programmer sees the robot thinking in real time.
+        </p>
+        <div class="attrs">
+          <span class="attr">Real-time dashboard</span>
+          <span class="attr">Remote program download</span>
+        </div>
+      </div>
+
+      <div class="callout d">
+        <div class="num">E</div>
+        <div class="kind">Audio · expressive</div>
+        <h3>Sound & LED Feedback</h3>
+        <p>
+          A speaker plays pre-recorded effects and speech; surround LEDs around the center button
+          pulse green (idle), orange (busy), or red (error) to signal state.
+        </p>
+        <div class="attrs">
+          <span class="attr">Multi-modal status</span>
+          <span class="attr">Programmable cues</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:28px; padding:20px; background:var(--d-soft); border-left:4px solid var(--d); border-radius:8px;">
+      <b style="color:#14807A; font-family:'Fredoka',sans-serif;">User interactions (digital):</b>
+      <span style="color:#0D544F;">
+        drag blocks to assemble a program · watch the block wires highlight as data flows ·
+        download over Bluetooth · open the port-view on the brick to debug a sensor · tweak a
+        motor’s degree parameter and re-run.
+      </span>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION 3 — MAPPINGS & CONNECTIONS
+  ========================================================= -->
+  <section class="frame annotate" data-label="FRAME · 04 · Mapping Layer">
+    <h2 class="section-title m"><span class="chip">03</span>Physical↔Digital Mapping</h2>
+    <div class="section-subtitle">
+      How every physical object has a digital twin — and vice-versa.
+    </div>
+
+    <div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          RJ-12 cable plugged into Port 1
+        </div>
+        <div class="map-arrow">⇄<span>auto-detect</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          Block’s port selector auto-highlights “1”; sensor type icon appears
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Motor shaft rotated manually 360°
+        </div>
+        <div class="map-arrow">⇄<span>encoder</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          Port-view shows <code>B: 360°</code>; variable <code>motorB.rotations = 1</code>
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Color sensor over a red tile
+        </div>
+        <div class="map-arrow">⇄<span>classify</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          <code>color == 5</code> (RED); switch-block branches into the red path
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Ultrasonic points 24 cm from wall
+        </div>
+        <div class="map-arrow">⇄<span>ranging</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          Sensor block outputs <code>24.0 cm</code> on a live data wire
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Center button pressed on the brick
+        </div>
+        <div class="map-arrow">⇄<span>hardware event</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          Program <code>MyProgram</code> selected from the menu runs on firmware
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Orange cable run from brick port B to a motor
+        </div>
+        <div class="map-arrow">⇄<span>binds</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          Every <i>Large Motor B</i> block in the IDE is bound to this specific motor
+        </div>
+      </div>
+
+      <div class="map-row">
+        <div class="map-side phys">
+          <b>PHYSICAL</b>
+          Red status ring lights up on the brick
+        </div>
+        <div class="map-arrow">⇄<span>visual echo</span></div>
+        <div class="map-side dig">
+          <b>DIGITAL</b>
+          IDE’s telemetry panel shows <code>state = running</code>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =========================================================
+       SECTION 4 — REFLECTION: HOW THEY ENRICH EACH OTHER
+  ========================================================= -->
+  <section class="reflect">
+    <h2><span class="chip">★</span>How they empower & enrich each other</h2>
+    <p style="color:rgba(255,255,255,0.8); max-width:740px;">
+      LEGO Mindstorms’ genius is the <b style="color:var(--accent)">tight feedback loop between body and code</b>.
+      Neither half is interesting alone — a brick without firmware is a shelf ornament, and a block editor
+      without bricks is a flow-chart toy. Together, they become a system where every abstract concept has
+      a physical anchor, and every physical event has a numeric readout.
+    </p>
+
+    <div class="grid">
+      <div class="box">
+        <b>1 · Shared grammar of “snap-together”</b>
+        <p>
+          Technic pins snap into beams; IDE blocks snap into sequences. The <i>same metaphor</i>
+          governs both worlds, so the mental model transfers instantly — if you can build the body,
+          you can build the code.
+        </p>
+      </div>
+      <div class="box">
+        <b>2 · Tangible debugging</b>
+        <p>
+          When a program misbehaves, the robot visibly veers off course. Kids can <i>see</i> bugs
+          with their eyes, not just read them in a stack trace. Physical failure is the best error
+          message.
+        </p>
+      </div>
+      <div class="box">
+        <b>3 · Bidirectional causality</b>
+        <p>
+          Push the motor by hand → port-view number ticks up. Change the block parameter → motor
+          turns further. The causal arrow works <i>both ways</i>, which makes the mapping
+          learnable by discovery rather than instruction.
+        </p>
+      </div>
+      <div class="box">
+        <b>4 · Progressive disclosure</b>
+        <p>
+          Beginners see only block icons and bricks. Advanced users drop into ev3dev shells or wire
+          typed data between blocks. The system grows with the learner — the physical frame stays
+          the same.
+        </p>
+      </div>
+      <div class="box">
+        <b>5 · Affordances teach programming concepts</b>
+        <p>
+          Cables = variables. Ports = pointers. Plug-and-play = type inference. The invisible
+          machinery of software becomes <i>visible</i> through plastic.
+        </p>
+      </div>
+      <div class="box">
+        <b>6 · Physical constraints → creative constraints</b>
+        <p>
+          Four output ports, four input ports, a gear ratio that can’t be cheated. The hardware’s
+          finite vocabulary forces thoughtful programming — a bug the industry calls
+          <i>the right amount of friction</i>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>
+      <b>CMAA5043 · Creative Prototyping · Spring 2026</b><br>
+      Week 11 — Design Activity · Tangible User Interface Analysis<br>
+      Yusong Huang · yhuang411@connect.hkust-gz.edu.cn
+    </div>
+    <div style="text-align:right;">
+      <a href="../index.html">↩ back to portfolio</a><br>
+      <span style="font-family:'JetBrains Mono', monospace;">last edit · 2026-04-20</span>
+    </div>
+  </footer>
+
+</main>
+
+</body>
+</html>

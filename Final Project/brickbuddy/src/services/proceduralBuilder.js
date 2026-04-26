@@ -26,8 +26,6 @@ const brick = (x, yBottom, z, w, d, color) =>
   ({ type: 'brick', pos: [x, yBottom + B / 2, z], size: [w, B, d], color });
 const tallBrick = (x, yBottom, z, w, d, h, color) =>
   ({ type: 'brick', pos: [x, yBottom + h / 2, z], size: [w, h, d], color });
-const slope = (x, yBottom, z, w, d, color) =>
-  ({ type: 'slope', pos: [x, yBottom + B / 2, z], size: [w, B, d], color });
 const tallSlope = (x, yBottom, z, w, d, h, color) =>
   ({ type: 'slope', pos: [x, yBottom + h / 2, z], size: [w, h, d], color });
 const cyl = (x, yBottom, z, r, h, color) =>
@@ -568,9 +566,8 @@ function buildFlyer(palette, opts) {
   ];
 }
 
-function buildGiant(palette, opts) {
+function buildGiant(palette) {
   const { primary, accent, secondary, eye, nose } = palette;
-  const seed = opts.seed % 3;
   const legGap = 1.6;
   const bodyLen = 8;
 
@@ -930,7 +927,7 @@ const FEATURE_STEP_BUILDERS = {
       ],
     };
   },
-  fangs(palette) {
+  fangs() {
     return {
       title: 'Add Sharp Fangs', emoji: '🦷',
       desc: 'Place two pointy fangs hanging from the front of the head.',
@@ -955,7 +952,7 @@ const FEATURE_STEP_BUILDERS = {
       newParts: out,
     };
   },
-  crown(palette) {
+  crown() {
     return {
       title: 'Crown the Head', emoji: '👑',
       desc: 'Place a tiny gold crown on top of the head.',
@@ -1140,6 +1137,7 @@ export function applyChatModification(model, text) {
       const clone = structuredClone(model);
       const palette = clone.palette || derivePaletteFromModel(clone);
       const added = [];
+      const newStepIndex = clone.steps.length;
       for (const f of features) {
         const fb = FEATURE_STEP_BUILDERS[f];
         if (!fb) continue;
@@ -1156,6 +1154,9 @@ export function applyChatModification(model, text) {
           model: clone,
           changed: `Added ${added.join(' and ')} as a new step`,
           kind: 'add-feature',
+          // First newly-appended step index — caller (BuildScreen) jumps
+          // currentStep here so the kid sees the change land immediately.
+          newStepIndex,
         };
       }
     }

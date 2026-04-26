@@ -44,10 +44,10 @@ function FloatingBricks() {
 
 function FeatureStrip() {
   const items = [
-    { icon: '\u{1F399}\uFE0F', label: 'Talk anytime' },
-    { icon: '\u{1F440}',       label: 'Watches your build' },
-    { icon: '\u{1F9F1}',       label: 'Any robot you imagine' },
-    { icon: '\u{1F9E0}',       label: 'Teaches as you go' },
+    { icon: '\u{1F4F7}',           label: 'Scans your pile' },
+    { icon: '\u{1F399}\uFE0F',     label: 'Listens to ideas' },
+    { icon: '\u{1F4D6}',           label: 'Live-rewrites the manual' },
+    { icon: '\u{1F9E0}',           label: 'Teaches STEAM' },
   ];
   return (
     <div style={{
@@ -75,7 +75,7 @@ export default function SplashScreen() {
 
   const handleStart = () => {
     if (soundEnabled) playClick();
-    setStage('imagine');
+    setStage('discover');
   };
 
   return (
@@ -99,18 +99,20 @@ export default function SplashScreen() {
         <div style={{ marginBottom: -12 }}>
           <BuddyFace size={128} state="idle" mood="happy" />
         </div>
-        <Kicker>Build anything · for ages 6&ndash;8</Kicker>
+        <Kicker>For builders aged 6&ndash;8</Kicker>
         <Display size="xl" style={{ maxWidth: 680 }}>
-          Say it.<br />
-          <span style={{ color: 'var(--brick-red)' }}>Build it.</span>{' '}
-          <span style={{ color: 'var(--brick-orange)' }}>Together.</span>
+          Show me your{' '}
+          <span style={{ color: 'var(--brick-red)' }}>pile</span>.
+          <br />
+          I&rsquo;ll find a{' '}
+          <span style={{ color: 'var(--brick-orange)' }}>build</span>.
         </Display>
         <p style={{
           fontSize: 20, lineHeight: 1.5, color: 'var(--ink-3)',
           margin: 0, maxWidth: 560,
         }}>
-          Tell Buddy what you want to build. It watches, listens, and walks you through
-          every brick &mdash; one step at a time.
+          Scan your bricks, pick a robot, then change anything you want by voice or tap.
+          The instruction manual rewrites itself in real time.
         </p>
 
         <Btn variant="brick" size="xl" onClick={handleStart}

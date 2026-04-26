@@ -64,7 +64,7 @@ const QUIZ = {
 };
 
 export default function LearnScreen() {
-  const { selectedModel, setStage, steamProgress, chatHistory, soundEnabled } = useBuild();
+  const { selectedModel, setStage, steamProgress, modificationLog, soundEnabled } = useBuild();
   const modelId = selectedModel?.id || 'dog';
   const learning = HIGHLIGHTS[modelId] || HIGHLIGHTS.dog;
   const quiz = QUIZ[modelId] || QUIZ.dog;
@@ -77,7 +77,7 @@ export default function LearnScreen() {
 
   const facts = steamFacts[activeTopic] || [];
   const totalSteam = Object.values(steamProgress).reduce((a, b) => a + b, 0);
-  const questionsAsked = chatHistory.filter(m => m.role === 'child').length;
+  const customizations = modificationLog?.length || 0;
   const topicsExplored = Object.values(steamProgress).filter(v => v > 0).length;
 
   const handlePick = (i) => {
@@ -125,7 +125,7 @@ export default function LearnScreen() {
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
               <Chip bg="rgba(47,111,235,0.14)" color="var(--live)">{totalSteam} STEAM</Chip>
-              <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">{questionsAsked} questions</Chip>
+              <Chip bg="rgba(15,153,104,0.14)" color="var(--ok)">{customizations} customizations</Chip>
               <Chip bg="rgba(225,79,59,0.14)" color="var(--brick-red)">{topicsExplored} topics</Chip>
               <Btn variant="brick" size="sm" onClick={() => { if (soundEnabled) playSuccess(); setStage('celebrate'); }} icon="🎉">
                 Celebrate
